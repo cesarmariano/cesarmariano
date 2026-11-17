@@ -1,0 +1,13 @@
+{
+  "name": "Visitas Alveon – Oxigenoterapia",
+  "short_name": "Visitas Alveon",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f6f8",
+  "theme_color": "#0b6e8a",
+  "lang": "es",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
