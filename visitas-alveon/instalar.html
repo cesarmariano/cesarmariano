@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b6e8a">
+  <title>Instalar Visitas Alveon</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .hero { text-align: center; }
+    .hero img.logo { width: 96px; height: 96px; border-radius: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+    #qr { display: inline-block; background: #fff; padding: 12px; border-radius: 12px; margin: 8px 0; }
+    #qr img { display: block; width: 220px; height: 220px; image-rendering: pixelated; }
+    .link { word-break: break-all; font-weight: 600; color: var(--brand); }
+    ol { padding-left: 20px; margin: 6px 0 0; }
+    li { margin-bottom: 6px; }
+    h3 { margin: 0 0 4px; font-size: 1rem; }
+    .actual { border-color: var(--brand); border-width: 2px; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="icon-btn" href="index.html" aria-label="Volver a la aplicación" style="display:flex;align-items:center;justify-content:center;text-decoration:none">&larr;</a>
+    <h1>Instalar Visitas Alveon</h1>
+  </header>
+  <main>
+    <div class="card hero">
+      <img class="logo" src="icons/icon-192.png" alt="Logo de Alveon">
+      <p>Enlace de la aplicación (el mismo para todos los dispositivos):</p>
+      <p class="link" id="url"></p>
+      <div class="actions">
+        <button class="btn" id="copiar">Copiar enlace</button>
+        <button class="btn primary" id="instalar" disabled>Instalar aquí</button>
+      </div>
+      <p class="hint">Escanee este código con la cámara del celular para abrir la aplicación:</p>
+      <div id="qr"></div>
+    </div>
+
+    <div class="card" data-so="android">
+      <h3>Celular Android (Chrome)</h3>
+      <ol>
+        <li>Abra el enlace en Chrome.</li>
+        <li>Toque <b>Instalar</b> en el aviso que aparece, o el menú <b>⋮</b> → <b>Instalar aplicación</b> (o <b>Agregar a pantalla principal</b>).</li>
+        <li>El ícono de Alveon queda en la pantalla de inicio.</li>
+      </ol>
+    </div>
+    <div class="card" data-so="ios">
+      <h3>iPhone (Safari)</h3>
+      <ol>
+        <li>Abra el enlace en Safari.</li>
+        <li>Toque el botón <b>Compartir</b> (cuadrado con flecha hacia arriba).</li>
+        <li>Elija <b>Agregar a inicio</b> y luego <b>Agregar</b>.</li>
+      </ol>
+    </div>
+    <div class="card" data-so="mac">
+      <h3>Mac</h3>
+      <ol>
+        <li><b>Chrome o Edge:</b> abra el enlace y haga clic en el ícono de instalar en la barra de direcciones (pantalla con flecha), o menú <b>⋮</b> → <b>Transmitir, guardar y compartir</b> → <b>Instalar página como app</b>.</li>
+        <li><b>Safari (macOS 14 o posterior):</b> menú <b>Archivo</b> → <b>Agregar al Dock</b>.</li>
+        <li>La aplicación aparece en Launchpad y en la carpeta Aplicaciones.</li>
+      </ol>
+    </div>
+    <div class="card" data-so="linux">
+      <h3>Linux (Chrome, Chromium o Edge)</h3>
+      <ol>
+        <li>Abra el enlace en Chrome o Chromium.</li>
+        <li>Haga clic en el ícono de instalar en la barra de direcciones, o menú <b>⋮</b> → <b>Transmitir, guardar y compartir</b> → <b>Instalar página como app</b>.</li>
+        <li>La aplicación queda en el menú de aplicaciones del escritorio. Firefox no permite instalarla; puede usarse como página normal.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h3>Datos en todos los dispositivos</h3>
+      <p class="hint" style="margin:0">Cada dispositivo guarda sus datos por separado. Para ver la misma información en todos, en cada uno vaya a <b>Ajustes → Conectar Google Drive</b> con la misma cuenta de Google.</p>
+    </div>
+  </main>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="lib/qrcode.js"></script>
+  <script>
+    'use strict';
+    const url = new URL('index.html', location.href).href;
+    document.getElementById('url').textContent = url;
+    try {
+      const qr = qrcode(0, 'M'); qr.addData(url); qr.make();
+      document.getElementById('qr').innerHTML = qr.createImgTag(6, 0, 'Código QR del enlace');
+    } catch (_) { document.getElementById('qr').hidden = true; }
+
+    const toast = m => { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); };
+    document.getElementById('copiar').onclick = async () => {
+      try { await navigator.clipboard.writeText(url); toast('Enlace copiado.'); }
+      catch (_) { toast('No se pudo copiar. Mantenga presionado el enlace para copiarlo.'); }
+    };
+
+    let ev = null; const bi = document.getElementById('instalar');
+    window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); ev = e; bi.disabled = false; });
+    bi.onclick = async () => { if (!ev) return; ev.prompt(); await ev.userChoice; ev = null; bi.disabled = true; };
+    if (matchMedia('(display-mode: standalone)').matches) { bi.textContent = 'Ya instalada'; }
+
+    // Resalta las instrucciones del dispositivo actual y las muestra primero.
+    const ua = navigator.userAgent;
+    const so = /Android/i.test(ua) ? 'android' : /iPhone|iPad/i.test(ua) ? 'ios' : /Mac/i.test(ua) ? 'mac' : /Linux/i.test(ua) ? 'linux' : '';
+    const c = so && document.querySelector(`[data-so="${so}"]`);
+    if (c) { c.classList.add('actual'); c.parentNode.insertBefore(c, document.querySelector('[data-so]')); }
+
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  </script>
+</body>
+</html>

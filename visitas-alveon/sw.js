@@ -1,8 +1,9 @@
 // Permite usar la aplicación sin conexión una vez abierta por primera vez.
-const CACHE = 'visitas-alveon-v1';
+const CACHE = 'visitas-alveon-v2';
 const FILES = [
-  './', './index.html', './styles.css', './app.js', './icon.svg', './manifest.webmanifest',
-  './lib/jspdf.umd.min.js', './lib/jspdf.plugin.autotable.min.js'
+  './', './index.html', './instalar.html', './styles.css', './app.js', './config.js', './drive.js',
+  './manifest.webmanifest', './logo.png', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
+  './lib/jspdf.umd.min.js', './lib/jspdf.plugin.autotable.min.js', './lib/qrcode.js'
 ];
 
 self.addEventListener('install', e => {
@@ -19,7 +20,7 @@ self.addEventListener('activate', e => {
 
 // Red primero, caché como respaldo: así las actualizaciones llegan apenas hay conexión.
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
+  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
     fetch(e.request)
       .then(res => {

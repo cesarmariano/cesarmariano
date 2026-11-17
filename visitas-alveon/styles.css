@@ -128,3 +128,21 @@ h2 { font-size: 1.05rem; margin: 0 0 12px; }
   transition: transform .25s; max-width: calc(100% - 32px); z-index: 20;
 }
 #toast.show { transform: translateX(-50%) translateY(0); }
+
+/* Agregados v2 */
+.topbar-logo { width: 30px; height: 30px; border-radius: 7px; background: #fff; object-fit: contain; }
+#btn-back:not([hidden]) + .topbar-logo { display: none; }
+#btn-sync[data-estado="pendiente"] { color: #ffd166; }
+#btn-sync[data-estado="inactivo"] { opacity: .6; }
+#btn-sync.girando { animation: pulso 1s infinite; }
+@keyframes pulso { 50% { opacity: .3; } }
+.segmented { display: flex; background: var(--border); border-radius: 10px; padding: 3px; gap: 3px; margin-bottom: 12px; }
+.segmented button {
+  flex: 1; min-height: 40px; border: 0; border-radius: 8px; background: transparent;
+  color: var(--text); font-size: .9rem; font-weight: 600; cursor: pointer;
+}
+.segmented button.on { background: var(--card); color: var(--brand); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.row-between { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.banner { display: flex; align-items: center; gap: 12px; }
+.banner .btn { width: auto; flex: none; }
+select.field { appearance: auto; }

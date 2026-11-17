@@ -1,17 +1,33 @@
 # Visitas Alveon – Oxigenoterapia
 
-Aplicación web para registrar las visitas periódicas a médicos y el seguimiento de pacientes referidos al servicio de oxigenoterapia de Alveon. Está diseñada para completarse desde el celular.
+Aplicación web instalable (celular, Mac y Linux) para registrar las visitas periódicas a médicos y los pacientes referidos al servicio de oxigenoterapia de Alveon.
+
+- Aplicación: https://cesarmariano.github.io/cesarmariano/visitas-alveon/
+- Instalación en otros dispositivos (enlace, QR e instrucciones): https://cesarmariano.github.io/cesarmariano/visitas-alveon/instalar.html
 
 ## Funciones
-- **Nuevo médico** (asistente paso a paso): nombre, especialidad, institución, ubicación, celular de WhatsApp (se solicita una única vez), fecha de la última visita, pacientes referidos (total acumulado) y notas.
-- **Registrar visita**: fecha, total actualizado de pacientes referidos y notas. Queda un historial por médico.
-- **Botón de WhatsApp** directo al número cargado.
-- **Indicador de visitas pendientes** según la frecuencia configurada (30 días por defecto).
-- **Generar PDF**: tabla con Nombre, Institución, Fecha última visita, Pacientes referidos, Ubicación, Especialidad y Celular, con total al pie. En el celular se ofrece compartirlo (WhatsApp, correo, Drive).
-- **Copia de seguridad**: exportar e importar los datos en un archivo JSON (Ajustes).
-- Funciona sin conexión y puede agregarse a la pantalla de inicio.
+- **Nuevo médico** (asistente paso a paso): nombre, especialidad, institución, provincia, ciudad, dirección, celular de WhatsApp (una única vez), fecha de la última visita, pacientes referidos (total acumulado), próxima visita programada y notas.
+- **Registrar visita**: fecha, total acumulado de pacientes referidos, próxima visita y notas. Historial por médico.
+- **Lista** ordenable por próxima visita, por cantidad de pacientes referidos o por nombre; avisos de visitas vencidas.
+- **PDF** con filtros: período (todo, desde/hasta, año o mes), institución, provincia y ciudad. Columnas: Nombre, Institución, Fecha última visita, Pacientes referidos, (Referidos en el período), Próxima visita, Ubicación, Provincia, Especialidad y Celular.
+- **Google Drive**: sincronización entre dispositivos y respaldo diario en la carpeta *Alveon Visitas*.
+- Funciona sin conexión.
 
-## Uso
-Publicar la carpeta en cualquier hosting estático (por ejemplo GitHub Pages) y abrir `index.html` desde el celular.
+## Puesta en marcha
 
-Los datos se guardan sólo en el navegador del dispositivo; se recomienda exportar una copia de seguridad con regularidad.
+### 1. Publicar en GitHub Pages (una sola vez)
+Repositorio → **Settings** → **Pages** → *Build and deployment* → Source: **Deploy from a branch** → Branch: `claude/agente-visitas-medicas-n19ccr`, carpeta `/ (root)` → **Save**.
+
+### 2. Conectar Google Drive (una sola vez)
+1. Ingresar a https://console.cloud.google.com/ y crear un proyecto (por ejemplo, "Visitas Alveon").
+2. **APIs y servicios → Biblioteca**: habilitar **Google Drive API**.
+3. **Pantalla de consentimiento de OAuth** (Google Auth Platform): tipo *Externo*, nombre de la aplicación, correo de soporte. En **Público / Usuarios de prueba**, agregar la propia cuenta de Gmail.
+4. **Credenciales → Crear credenciales → ID de cliente de OAuth** → tipo *Aplicación web*. En **Orígenes autorizados de JavaScript** agregar `https://cesarmariano.github.io`.
+5. Copiar el **ID de cliente** (termina en `.apps.googleusercontent.com`). No es una contraseña: puede cargarse en `config.js` o en **Ajustes** de la aplicación.
+6. En cada dispositivo: **Ajustes → Conectar Google Drive** e ingresar con la misma cuenta.
+
+### 3. Logo
+Para reemplazar el logo provisorio: `python3 tools/generar_iconos.py ruta/al/LogoTransparenteAlveon.png` (genera `logo.png` y los íconos).
+
+## Datos
+Cada dispositivo guarda una copia local. Al sincronizar se combinan las copias: por cada médico prevalece la modificación más reciente y las visitas de ambos dispositivos se conservan.
