@@ -1,6 +1,6 @@
 :root {
-  --brand: #0b6e8a;
-  --brand-dark: #08566c;
+  --brand: #0a47b8;
+  --brand-dark: #0a1f63;
   --bg: #f3f6f8;
   --card: #ffffff;
   --text: #1c2830;
@@ -31,6 +31,7 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 .topbar {
+  background: linear-gradient(90deg, #0a1f63, #0a47b8) !important;
   position: sticky; top: 0; z-index: 5;
   display: flex; align-items: center; gap: 8px;
   background: var(--brand); color: #fff;

@@ -554,7 +554,7 @@ let logoCache;
 async function cargarLogo() {
   if (logoCache !== undefined) return logoCache;
   try {
-    const r = await fetch('logo.png');
+    const r = await fetch('logo.jpg');
     if (!r.ok) throw new Error();
     const blob = await r.blob();
     const url = await new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(blob); });
@@ -576,10 +576,10 @@ async function generarPDF(f) {
   if (logo) {
     let h = 16, w = (logo.w / logo.h) * h;
     if (w > 45) { w = 45; h = (logo.h / logo.w) * w; }
-    doc.addImage(logo.url, 'PNG', 14, 7, w, h);
+    doc.addImage(logo.url, 'JPEG', 14, 7, w, h);
     x = 14 + w + 5;
   }
-  doc.setFontSize(16); doc.setTextColor(11, 110, 138);
+  doc.setFontSize(16); doc.setTextColor(10, 31, 99);
   doc.text('Alveon – Oxigenoterapia', x, 15);
   doc.setFontSize(11); doc.setTextColor(60);
   doc.text('Registro de visitas a médicos', x, 21.5);
@@ -610,8 +610,8 @@ async function generarPDF(f) {
     head: [head], body, foot: [foot], showFoot: 'lastPage',
     theme: 'grid',
     styles: { fontSize: 8, cellPadding: 2, valign: 'middle' },
-    headStyles: { fillColor: [11, 110, 138], textColor: 255, halign: 'center', fontSize: 8 },
-    footStyles: { fillColor: [230, 240, 244], textColor: 20, fontStyle: 'bold' },
+    headStyles: { fillColor: [10, 31, 99], textColor: 255, halign: 'center', fontSize: 8 },
+    footStyles: { fillColor: [225, 236, 252], textColor: 20, fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [245, 248, 250] },
     columnStyles: colStyles,
     didParseCell: d => { if (d.section === 'foot' && (d.column.index === 3 || (conPeriodo && d.column.index === 4))) d.cell.styles.halign = 'center'; },

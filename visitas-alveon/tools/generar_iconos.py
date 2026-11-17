@@ -1,7 +1,9 @@
 """Genera los íconos de la aplicación a partir de logo.png.
 
-Uso (desde la carpeta visitas-alveon):  python3 tools/generar_iconos.py [ruta/al/logo.png]
-Si se indica una ruta, primero se copia esa imagen como logo.png (reducida a 800 px de ancho).
+Uso (desde la carpeta visitas-alveon):
+  python3 tools/generar_iconos.py [ruta/al/logo] [ruta/al/simbolo]
+- logo: imagen completa; se guarda como logo.png (para el PDF).
+- simbolo: imagen usada para los íconos (por ejemplo, sólo el isotipo). Si se omite, se usa el logo.
 """
 import sys
 from pathlib import Path
@@ -9,6 +11,7 @@ from PIL import Image
 
 BASE = Path(__file__).resolve().parent.parent
 LOGO = BASE / "logo.png"
+LOGO_PDF = BASE / "logo.jpg"
 SALIDA = BASE / "icons"
 
 
@@ -34,9 +37,14 @@ def main():
     if len(sys.argv) > 1:
         origen = Image.open(sys.argv[1]).convert("RGBA")
         origen = recortar_bordes(origen)
-        origen.thumbnail((800, 800), Image.LANCZOS)
+        origen.thumbnail((900, 900), Image.LANCZOS)
         origen.save(LOGO, optimize=True)
-    img = recortar_bordes(Image.open(LOGO))
+        # Versión liviana para el PDF (JPEG sobre fondo blanco)
+        fondo = Image.new("RGBA", origen.size, (255, 255, 255, 255))
+        Image.alpha_composite(fondo, origen).convert("RGB").resize(
+            (600, round(600 * origen.height / origen.width)), Image.LANCZOS).save(LOGO_PDF, quality=88)
+    fuente = sys.argv[2] if len(sys.argv) > 2 else LOGO
+    img = recortar_bordes(Image.open(fuente).convert("RGBA"))
     SALIDA.mkdir(exist_ok=True)
     cuadrado(img, 192, 0.08).save(SALIDA / "icon-192.png", optimize=True)
     cuadrado(img, 512, 0.08).save(SALIDA / "icon-512.png", optimize=True)
