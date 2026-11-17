@@ -188,3 +188,6 @@ body.con-nav #toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
 .check { display: flex; align-items: center; gap: 10px; font-weight: 600; margin: 4px 0 8px; }
 .check input { width: 22px; height: 22px; }
 .visit .meta span { overflow-wrap: anywhere; }
+.pill.info { background: rgba(10,71,184,.12); color: var(--brand); }
+.choice.multi button { flex: 1 1 calc(25% - 8px); min-width: 64px; }
+.pills { min-width: 0; } .pills .pill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }

@@ -10,6 +10,8 @@ const PROVINCIAS = ['Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Có
   'Entre Ríos', 'Formosa', 'Jujuy', 'La Pampa', 'La Rioja', 'Mendoza', 'Misiones', 'Neuquén',
   'Río Negro', 'Salta', 'San Juan', 'San Luis', 'Santa Cruz', 'Santa Fe', 'Santiago del Estero',
   'Tierra del Fuego', 'Tucumán'];
+const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const DIAS_LARGO = { Lun: 'lunes', Mar: 'martes', 'Mié': 'miércoles', Jue: 'jueves', Vie: 'viernes', 'Sáb': 'sábados', Dom: 'domingos' };
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
   'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -45,6 +47,7 @@ function normalizar(d) {
     if (m.ubicacion !== undefined && m.direccion === undefined) { m.direccion = m.ubicacion; delete m.ubicacion; }
     m.direccion = m.direccion || ''; m.ciudad = m.ciudad || ''; m.provincia = m.provincia || '';
     m.proximaVisita = m.proximaVisita || '';
+    m.horarios = (m.horarios || []).map(h => ({ ...h, id: h.id || uid() }));
     m.visitas = (m.visitas || []).map(v => ({ ...v, id: v.id || uid() }));
     m.actualizado = m.actualizado || m.creado || '';
   });
@@ -97,6 +100,19 @@ const ultimaVisita = m => (ordenVisitas(m)[0] || {}).fecha || '';
 // El total vigente es el informado en la visita más reciente.
 const pacientesTotal = m => Number((ordenVisitas(m)[0] || {}).pacientes) || 0;
 const ubicacionTexto = m => [m.direccion, m.ciudad, m.provincia].filter(Boolean).join(', ');
+
+/* ---------- Días y horarios de atención ---------- */
+const diasDe = h => String(h.dias || '').split(',').filter(Boolean).sort((a, b) => DIAS.indexOf(a) - DIAS.indexOf(b));
+function listaDias(dias) {
+  const l = dias.map(d => DIAS_LARGO[d] || d);
+  return l.length > 1 ? l.slice(0, -1).join(', ') + ' y ' + l[l.length - 1] : l[0] || '';
+}
+const capitalizar = t => (t ? t[0].toUpperCase() + t.slice(1) : '');
+const rangoHoras = h => (h.desde || h.hasta ? `${h.desde || '…'} a ${h.hasta || '…'} h` : '');
+const diaHoy = () => DIAS[(new Date().getDay() + 6) % 7];
+const ordenHorarios = m => [...(m.horarios || [])].sort((a, b) =>
+  DIAS.indexOf(diasDe(a)[0]) - DIAS.indexOf(diasDe(b)[0]) || String(a.desde).localeCompare(String(b.desde)));
+const horariosHoy = m => ordenHorarios(m).filter(h => diasDe(h).includes(diaHoy()));
 
 /* ---------- Utilidades ---------- */
 const $ = sel => document.querySelector(sel);
@@ -164,7 +180,7 @@ function renderHome() {
   const q = estadoHome.filtro.trim().toLowerCase();
   const todos = activos();
   const lista = todos
-    .filter(m => !q || [m.nombre, m.institucion, m.ciudad, m.provincia, m.direccion, m.especialidad].join(' ').toLowerCase().includes(q))
+    .filter(m => !q || [m.nombre, m.institucion, m.ciudad, m.provincia, m.direccion, m.especialidad, ...(m.horarios || []).map(h => h.lugar)].join(' ').toLowerCase().includes(q))
     .sort((a, b) => {
       if (estadoHome.orden === 'pacientes') return pacientesTotal(b) - pacientesTotal(a) || a.nombre.localeCompare(b.nombre, 'es');
       if (estadoHome.orden === 'nombre') return a.nombre.localeCompare(b.nombre, 'es');
@@ -213,7 +229,8 @@ function itemMedico(m) {
       <div class="info">
         <div class="name">${esc(m.nombre)}</div>
         <div class="sub">${esc(lugar)}</div>
-        <div style="margin-top:6px"><span class="pill ${e.cls}">${esc(e.txt)}</span></div>
+        <div class="pills"><span class="pill ${e.cls}">${esc(e.txt)}</span>
+          ${horariosHoy(m).map(h => `<span class="pill info">Atiende hoy${h.desde ? ' ' + esc(h.desde) + (h.hasta ? '–' + esc(h.hasta) : '') : ''}</span>`).join('')}</div>
       </div>
       <div class="count"><b>${pacientesTotal(m)}</b><small>pacientes</small></div>
     </button>`;
@@ -232,12 +249,28 @@ function pasosNuevoMedico() {
     { key: 'ciudad', q: '¿En qué ciudad o localidad?', hint: 'Por ejemplo: La Plata, Quilmes, Palermo.', type: 'text', required: true,
       sugerenciasFn: v => unicos(activos().filter(m => !v.provincia || m.provincia === v.provincia).map(m => m.ciudad)) },
     { key: 'direccion', q: '¿Cuál es la dirección?', hint: 'Calle y número del consultorio.', type: 'text' },
+    pasoHorario(false),
     { key: 'celular', q: 'Número de celular para WhatsApp', hint: 'Se solicita una única vez. Incluya código de país y de área, por ejemplo: +54 9 11 1234 5678.', type: 'tel', validate: v => !v || soloDigitos(v).length >= 8 || 'El número parece incompleto.' },
     { key: 'fecha', q: '¿Cuál fue la fecha de la última visita?', type: 'date', required: true, def: hoy(), max: hoy(), validate: validarPasado },
     { key: 'pacientes', q: '¿Cuántos pacientes refirió a su servicio hasta ahora?', hint: 'Total acumulado.', type: 'number', def: 0 },
     pasoProxima(),
     { key: 'notas', q: 'Notas de la visita', hint: 'Temas conversados, material entregado, próximos pasos.', type: 'textarea' }
   ];
+}
+
+function pasoHorario(obligatorio, institucion) {
+  const validarHasta = (x, v) => !v.desde || x > v.desde || 'Debe ser posterior a la hora de inicio.';
+  return { q: obligatorio ? 'Días y horario de atención' : '¿Qué días y en qué horario atiende?',
+    hint: obligatorio ? '' : 'Opcional. Si atiende en varios lugares, cargue uno ahora y agregue los demás desde su perfil.',
+    campos: [
+      { key: 'dias', label: 'Días', type: 'multi', opciones: DIAS, required: obligatorio },
+      { key: 'desde', label: 'Desde', type: 'time' },
+      { key: 'hasta', label: 'Hasta', type: 'time', validate: validarHasta },
+      { key: 'lugar', label: 'Lugar donde atiende', type: 'text', hint: 'Institución, sede o consultorio.',
+        defFn: v => v.institucion || institucion || '',
+        sugerencias: unicos([...activos().map(m => m.institucion), ...activos().flatMap(m => (m.horarios || []).map(h => h.lugar))]) },
+      { key: 'detalleHorario', label: 'Observaciones', type: 'text', chips: ['Con turno previo', 'Por orden de llegada', 'Consultorio externo', 'Guardia'] }
+    ] };
 }
 
 function pasoProxima() {
@@ -291,6 +324,13 @@ function startWizard(pasos, datos, onFinish, titulo, onCancel, opts = {}) {
       </div>`;
     if (c.type === 'number') return `<input class="field" id="${id}" type="number" inputmode="decimal" min="0" step="any" value="${val}">`;
     if (c.type === 'date') return `<input class="field" id="${id}" type="date" ${c.max ? `max="${c.max}"` : ''} value="${val}">`;
+    if (c.type === 'time') return `<input class="field" id="${id}" type="time" value="${val}">`;
+    if (c.type === 'multi') {
+      const elegidos = String(v || '').split(',');
+      return `<div class="choice multi" data-multi="${c.key}">${opcionesDe(c).map(([o, l]) =>
+        `<button type="button" class="${elegidos.includes(o) ? 'on' : ''}" data-val="${esc(o)}" aria-pressed="${elegidos.includes(o)}">${esc(l)}</button>`).join('')}</div>
+        <input type="hidden" id="${id}" value="${val}">`;
+    }
     const extra = c.type === 'tel' ? 'inputmode="tel" autocomplete="tel"' : 'autocomplete="off" autocapitalize="sentences"';
     return `<input class="field" id="${id}" type="${c.type === 'tel' ? 'tel' : 'text'}" ${extra} value="${val}">`;
   }
@@ -333,7 +373,7 @@ function startWizard(pasos, datos, onFinish, titulo, onCancel, opts = {}) {
           <button type="submit" class="btn primary">${siguiente(1) >= pasos.length ? 'Revisar' : 'Siguiente'}</button>
         </div>
       </form>`;
-    const primero = campos.find(c => !['date', 'select', 'choice'].includes(c.type));
+    const primero = campos.find(c => !['date', 'select', 'choice', 'multi', 'time'].includes(c.type));
     if (unico && primero) setTimeout(() => $('#inp-' + primero.key)?.focus(), 50);
     view.querySelectorAll('[data-step]').forEach(b => (b.onclick = () => {
       const inp = b.parentNode.querySelector('input');
@@ -344,7 +384,12 @@ function startWizard(pasos, datos, onFinish, titulo, onCancel, opts = {}) {
       $('#inp-' + b.dataset.for).value = b.dataset.dias ? sumarDias(valores.fecha || hoy(), Number(b.dataset.dias)) : '';
     }));
     // Una opción elegida puede mostrar u ocultar otros campos: se vuelve a dibujar el paso.
-    view.querySelectorAll('.choice button').forEach(b => (b.onclick = () => {
+    view.querySelectorAll('.choice.multi button').forEach(b => (b.onclick = () => {
+      b.classList.toggle('on'); b.setAttribute('aria-pressed', b.classList.contains('on'));
+      const caja = b.closest('.choice');
+      $('#inp-' + caja.dataset.multi).value = [...caja.querySelectorAll('button.on')].map(x => x.dataset.val).join(',');
+    }));
+    view.querySelectorAll('.choice:not(.multi) button').forEach(b => (b.onclick = () => {
       guardar(); valores[b.closest('.choice').dataset.key] = b.dataset.val; paso();
     }));
     $('#atras').onclick = atras;
@@ -394,6 +439,7 @@ function startWizard(pasos, datos, onFinish, titulo, onCancel, opts = {}) {
   function mostrar(c, v) {
     if (v === '' || v == null) return '—';
     if (c.type === 'date') return fmtFecha(v);
+    if (c.type === 'multi') return esc(listaDias(String(v).split(',').filter(Boolean).sort((a, b) => DIAS.indexOf(a) - DIAS.indexOf(b))));
     if (c.type === 'select' || c.type === 'choice') { const o = opcionesDe(c).find(([x]) => x === v); return esc(o ? o[1] : v); }
     return esc(v);
   }
@@ -430,6 +476,8 @@ function startWizard(pasos, datos, onFinish, titulo, onCancel, opts = {}) {
   if (opts.resumen) resumen(); else paso();
 }
 
+const horarioDe = v => ({ id: v.id || uid(), dias: v.dias, desde: v.desde || '', hasta: v.hasta || '', lugar: v.lugar || '', detalle: v.detalleHorario || '' });
+
 function guardarNuevoMedico(v) {
   const m = {
     id: uid(),
@@ -437,7 +485,8 @@ function guardarNuevoMedico(v) {
     provincia: v.provincia, ciudad: v.ciudad, direccion: v.direccion || '',
     celular: v.celular || '', proximaVisita: v.proximaVisita || '',
     creado: ahora(), actualizado: ahora(),
-    visitas: [{ id: uid(), fecha: v.fecha, pacientes: v.pacientes, notas: v.notas || '' }]
+    visitas: [{ id: uid(), fecha: v.fecha, pacientes: v.pacientes, notas: v.notas || '' }],
+    horarios: v.dias ? [horarioDe(v)] : []
   };
   db.medicos.push(m); save();
   toast('Médico guardado.');
@@ -471,6 +520,20 @@ function renderDetalle(id) {
       <div class="label">Celular (WhatsApp)</div><div class="value">${esc(m.celular) || '—'}</div>
     </div>
     <div class="card">
+      <h2>Días y horarios de atención</h2>
+      ${ordenHorarios(m).map(h => `
+        <div class="visit">
+          <div class="meta"><span>${esc(capitalizar(listaDias(diasDe(h))))}</span>
+            ${diasDe(h).includes(diaHoy()) ? '<span class="pill info">Hoy</span>' : ''}</div>
+          <p>${[rangoHoras(h), h.lugar, h.detalle].filter(Boolean).map(esc).join(' · ')}</p>
+          <div class="chips" style="margin-top:6px">
+            <button class="chip" data-hor-edit="${h.id}">Editar</button>
+            <button class="chip" data-hor-del="${h.id}">Borrar</button>
+          </div>
+        </div>`).join('') || '<p class="hint">Sin horarios cargados.</p>'}
+      <button class="btn" id="btn-hor" style="margin-top:10px">+ Agregar horario</button>
+    </div>
+    <div class="card">
       <h2>Historial de visitas (${m.visitas.length})</h2>
       ${ordenVisitas(m).map(v => `
         <div class="visit">
@@ -491,6 +554,19 @@ function renderDetalle(id) {
   $('#btn-prox').onclick = () => startWizard([{ ...pasoProxima(), defFn: () => m.proximaVisita || sumarDias(hoy(), frecuencia()), validate: x => !x || x >= hoy() || 'La fecha debe ser hoy o posterior.' }],
     { fecha: hoy() }, v => { m.proximaVisita = v.proximaVisita || ''; tocar(m); save(); toast('Próxima visita actualizada.'); renderDetalle(m.id); },
     'Próxima visita', () => renderDetalle(m.id));
+  const editarHorario = h => startWizard([pasoHorario(true, m.institucion)],
+    h ? { ...h, detalleHorario: h.detalle } : { institucion: [m.institucion, m.direccion].filter(Boolean).join(', ') },
+    v => {
+      const nuevo = horarioDe({ ...v, id: h && h.id });
+      m.horarios = h ? m.horarios.map(x => (x.id === h.id ? nuevo : x)) : [...(m.horarios || []), nuevo];
+      tocar(m); save(); toast('Horario guardado.'); renderDetalle(m.id);
+    }, h ? 'Editar horario' : 'Nuevo horario', () => renderDetalle(m.id));
+  $('#btn-hor').onclick = () => editarHorario(null);
+  view.querySelectorAll('[data-hor-edit]').forEach(b => (b.onclick = () => editarHorario(m.horarios.find(x => x.id === b.dataset.horEdit))));
+  view.querySelectorAll('[data-hor-del]').forEach(b => (b.onclick = () => {
+    if (!confirm('¿Borrar este horario?')) return;
+    m.horarios = m.horarios.filter(x => x.id !== b.dataset.horDel); tocar(m); save(); renderDetalle(m.id);
+  }));
   $('#btn-editar').onclick = () => renderEditar(m.id);
   if ($('#btn-editar2')) $('#btn-editar2').onclick = () => renderEditar(m.id);
   view.querySelectorAll('[data-pac]').forEach(b => (b.onclick = () => renderDetallePaciente(b.dataset.pac, () => renderDetalle(m.id))));
