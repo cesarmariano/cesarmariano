@@ -24,10 +24,22 @@ function escribir(clave, valor) {
   try { localStorage.setItem(clave, JSON.stringify(valor)); return true; } catch (_) { return false; }
 }
 
+const CONFIG_BASE = {
+  representante: '', frecuenciaDias: 30, actualizado: '',
+  frecControlPac: 30,      // días entre controles de pacientes
+  mantDiasConc: 180,       // mantenimiento del concentrador: cada cuántos días
+  mantHorasConc: 5000,     // mantenimiento del concentrador: cada cuántas horas de uso (0 = no usar)
+  mantDiasCpap: 180        // servicio del CPAP: cada cuántos días
+};
+
 function normalizar(d) {
-  const base = { medicos: [], config: { representante: '', frecuenciaDias: 30, actualizado: '' } };
+  const base = { medicos: [], pacientes: [], config: { ...CONFIG_BASE } };
   if (!d || !Array.isArray(d.medicos)) return base;
-  d.config = { ...base.config, ...(d.config || {}) };
+  d.config = { ...CONFIG_BASE, ...(d.config || {}) };
+  d.pacientes = (d.pacientes || []).map(p => ({
+    ...p, estado: p.estado || 'activo', actualizado: p.actualizado || p.creado || '',
+    registros: (p.registros || []).map(r => ({ ...r, id: r.id || uid() }))
+  }));
   d.medicos.forEach(m => {
     // Migración de la versión anterior: "ubicacion" pasa a "direccion".
     if (m.ubicacion !== undefined && m.direccion === undefined) { m.direccion = m.ubicacion; delete m.ubicacion; }
@@ -54,21 +66,29 @@ const findMedico = id => db.medicos.find(m => m.id === id && !m.borrado);
 const tocar = m => (m.actualizado = ahora());
 
 /* Combina dos copias de los datos (de distintos dispositivos).
-   Por médico gana la versión modificada más recientemente; las visitas se unen. */
+   Por médico o paciente gana la versión modificada más recientemente; visitas y actividades se unen. */
 function combinar(a, b) {
   a = normalizar(JSON.parse(JSON.stringify(a)));
   b = normalizar(JSON.parse(JSON.stringify(b)));
+  const config = (a.config.actualizado || '') >= (b.config.actualizado || '') ? a.config : b.config;
+  return {
+    medicos: combinarLista(a.medicos, b.medicos, 'visitas'),
+    pacientes: combinarLista(a.pacientes, b.pacientes, 'registros'),
+    config
+  };
+}
+
+function combinarLista(la, lb, sub) {
   const mapa = new Map();
-  for (const m of [...a.medicos, ...b.medicos]) {
+  for (const m of [...la, ...lb]) {
     const prev = mapa.get(m.id);
     if (!prev) { mapa.set(m.id, m); continue; }
     const [nuevo, viejo] = (m.actualizado || '') >= (prev.actualizado || '') ? [m, prev] : [prev, m];
-    const visitas = new Map();
-    [...viejo.visitas, ...nuevo.visitas].forEach(v => visitas.set(v.id, v));
-    mapa.set(m.id, { ...nuevo, visitas: [...visitas.values()] });
+    const items = new Map();
+    [...(viejo[sub] || []), ...(nuevo[sub] || [])].forEach(v => items.set(v.id, v));
+    mapa.set(m.id, { ...nuevo, [sub]: nuevo.borrado ? [] : [...items.values()] });
   }
-  const config = (a.config.actualizado || '') >= (b.config.actualizado || '') ? a.config : b.config;
-  return { medicos: [...mapa.values()], config };
+  return [...mapa.values()];
 }
 
 /* ---------- Cálculos ---------- */
@@ -102,10 +122,19 @@ function toast(msg) {
   t.textContent = msg; t.classList.add('show');
   clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 3000);
 }
+let seccion = 'medicos';
+function irInicio() { return seccion === 'pacientes' ? renderPacientes() : renderHome(); }
+
 function setHeader(title, back) {
   $('#title').textContent = title;
   $('#btn-back').hidden = !back;
   $('#btn-back').onclick = back || null;
+  const nav = $('#bottom-nav');
+  if (nav) {
+    nav.hidden = !!back;
+    document.body.classList.toggle('con-nav', !back);
+    nav.querySelectorAll('[data-sec]').forEach(b => b.classList.toggle('on', b.dataset.sec === seccion));
+  }
   window.scrollTo(0, 0);
 }
 
@@ -130,6 +159,7 @@ function estadoVisita(m) {
 let estadoHome = { filtro: '', orden: 'proxima' };
 
 function renderHome() {
+  seccion = 'medicos';
   setHeader('Visitas a médicos', null);
   const q = estadoHome.filtro.trim().toLowerCase();
   const todos = activos();
@@ -228,94 +258,158 @@ function pasosVisita(m) {
   ];
 }
 
-function startWizard(pasos, datos, onFinish, titulo, onCancel) {
+/* Asistente genérico.
+   Cada paso puede ser un campo único ({ key, q, type, ... }) o un grupo ({ q, campos: [...] }).
+   Campos: key, label, type (text|tel|date|number|select|choice|textarea), required, def, defFn(valores),
+   opciones, chips, sugerencias, sugerenciasFn(valores), hint, validate(v, valores), max, entero, quick, si(valores).
+   Pasos y campos con "si" se muestran sólo cuando la condición se cumple.
+   opts.resumen = true abre directamente la pantalla de revisión (para editar). */
+function startWizard(pasos, datos, onFinish, titulo, onCancel, opts = {}) {
   let i = 0;
-  const salir = onCancel || (() => renderHome());
+  const salir = onCancel || irInicio;
   const valores = { ...datos };
-  pasos.forEach(p => { if (valores[p.key] === undefined && p.def !== undefined) valores[p.key] = p.def; });
+  const camposDe = p => (p.campos ? p.campos : [{ ...p, label: p.q }]);
+  const aplica = x => !x.si || x.si(valores);
+  const opcionesDe = c => (c.opciones || []).map(o => (Array.isArray(o) ? o : [o, o]));
+  pasos.forEach(p => camposDe(p).forEach(c => { if (valores[c.key] === undefined && c.def !== undefined) valores[c.key] = c.def; }));
+  const siguiente = dir => { let j = i + dir; while (j >= 0 && j < pasos.length && !aplica(pasos[j])) j += dir; return j; };
+  const visibles = () => pasos.filter(aplica);
 
-  function campo(p, v) {
+  function control(c, v, unico) {
     const val = esc(v ?? '');
-    if (p.type === 'textarea') return `<textarea class="field" id="inp">${val}</textarea>`;
-    if (p.type === 'select') return `<select class="field" id="inp"><option value="">Seleccione…</option>${p.opciones.map(o => `<option ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
-    if (p.type === 'number') return `
+    const id = 'inp-' + c.key;
+    if (c.type === 'textarea') return `<textarea class="field" id="${id}">${val}</textarea>`;
+    if (c.type === 'select') return `<select class="field" id="${id}"><option value="">Seleccione…</option>${opcionesDe(c).map(([o, l]) => `<option value="${esc(o)}" ${o === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+    if (c.type === 'choice') return `<div class="choice" data-key="${c.key}">${opcionesDe(c).map(([o, l]) =>
+      `<button type="button" class="${o === v ? 'on' : ''}" data-val="${esc(o)}">${esc(l)}</button>`).join('')}</div>
+      <input type="hidden" id="${id}" value="${val}">`;
+    if (c.type === 'number' && unico && c.entero !== false) return `
       <div class="stepper">
-        <button class="btn" type="button" id="menos" aria-label="Restar">−</button>
-        <input class="field" id="inp" type="number" inputmode="numeric" min="0" step="1" value="${val}">
-        <button class="btn" type="button" id="mas" aria-label="Sumar">+</button>
+        <button class="btn" type="button" data-step="-1" aria-label="Restar">−</button>
+        <input class="field" id="${id}" type="number" inputmode="numeric" min="0" step="1" value="${val}">
+        <button class="btn" type="button" data-step="1" aria-label="Sumar">+</button>
       </div>`;
-    if (p.type === 'date') return `<input class="field" id="inp" type="date" ${p.max ? `max="${p.max}"` : ''} value="${val}">`;
-    const extra = p.type === 'tel' ? 'inputmode="tel" autocomplete="tel"' : 'autocomplete="off" autocapitalize="words"';
-    return `<input class="field" id="inp" type="${p.type}" ${extra} value="${val}">`;
+    if (c.type === 'number') return `<input class="field" id="${id}" type="number" inputmode="decimal" min="0" step="any" value="${val}">`;
+    if (c.type === 'date') return `<input class="field" id="${id}" type="date" ${c.max ? `max="${c.max}"` : ''} value="${val}">`;
+    const extra = c.type === 'tel' ? 'inputmode="tel" autocomplete="tel"' : 'autocomplete="off" autocapitalize="sentences"';
+    return `<input class="field" id="${id}" type="${c.type === 'tel' ? 'tel' : 'text'}" ${extra} value="${val}">`;
+  }
+
+  function extras(c) {
+    const sug = c.sugerenciasFn ? c.sugerenciasFn(valores) : c.sugerencias;
+    const chips = c.chips || (sug && sug.slice(0, 8));
+    let h = '';
+    if (chips && chips.length) h += `<div class="chips">${chips.map(x => `<button type="button" class="chip" data-for="${c.key}" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>`;
+    if (c.quick) h += `<div class="chips">
+      ${[[7, '1 semana'], [15, '15 días'], [30, '1 mes'], [60, '2 meses'], [90, '3 meses']].map(([n, l]) => `<button type="button" class="chip" data-for="${c.key}" data-dias="${n}">${l}</button>`).join('')}
+      <button type="button" class="chip" data-for="${c.key}" data-dias="">Sin fecha</button></div>`;
+    return h;
   }
 
   function paso() {
     const p = pasos[i];
-    if (valores[p.key] === undefined && p.defFn) valores[p.key] = p.defFn(valores);
-    const sug = p.sugerenciasFn ? p.sugerenciasFn(valores) : p.sugerencias;
-    const chips = p.chips || (sug && sug.slice(0, 8));
-    setHeader(titulo, () => (i > 0 ? (guardarValor(), i--, paso()) : salir()));
+    const campos = camposDe(p).filter(aplica);
+    // Valores propuestos que dependen de otros datos; se recalculan mientras el usuario no los modifique.
+    campos.forEach(c => { if (c.defFn && (valores[c.key] === undefined || valores[c.key] === c._propuesto)) valores[c.key] = c._propuesto = c.defFn(valores); });
+    const vis = visibles(), n = vis.indexOf(p) + 1;
+    const unico = !p.campos;
+    setHeader(titulo, atras);
     view.innerHTML = `
-      <div class="progress"><span style="width:${((i + 1) / pasos.length) * 100}%"></span></div>
-      <div class="step-count">Paso ${i + 1} de ${pasos.length}</div>
+      <div class="progress"><span style="width:${(n / vis.length) * 100}%"></span></div>
+      <div class="step-count">Paso ${n} de ${vis.length}</div>
       <form id="wform" class="card" novalidate>
-        <p class="question">${esc(p.q)}${p.required ? '' : ' <span class="hint">(opcional)</span>'}</p>
+        <p class="question">${esc(p.q)}${unico && !p.required ? ' <span class="hint">(opcional)</span>' : ''}</p>
         ${p.hint ? `<p class="hint">${esc(p.hint)}</p>` : ''}
-        ${campo(p, valores[p.key])}
-        ${chips && chips.length ? `<div class="chips">${chips.map(c => `<button type="button" class="chip" data-v="${esc(c)}">${esc(c)}</button>`).join('')}</div>` : ''}
-        ${p.quick ? `<div class="chips">
-            ${[[7, '1 semana'], [15, '15 días'], [30, '1 mes'], [60, '2 meses']].map(([n, l]) => `<button type="button" class="chip" data-dias="${n}">${l}</button>`).join('')}
-            <button type="button" class="chip" data-dias="">Sin fecha</button></div>` : ''}
-        <div class="error" id="err"></div>
+        ${campos.map(c => `
+          <div class="form-row">
+            ${unico ? '' : `<label for="inp-${c.key}">${esc(c.label)}${c.required ? '' : ' <span class="hint">(opcional)</span>'}</label>
+            ${c.hint ? `<p class="hint" style="margin:0 0 6px">${esc(c.hint)}</p>` : ''}`}
+            ${control(c, valores[c.key], unico)}
+            ${extras(c)}
+            <div class="error" id="err-${c.key}"></div>
+          </div>`).join('')}
         <div class="wizard-nav">
-          <button type="button" class="btn" id="atras">${i === 0 ? 'Cancelar' : 'Atrás'}</button>
-          <button type="submit" class="btn primary">${i === pasos.length - 1 ? 'Revisar' : 'Siguiente'}</button>
+          <button type="button" class="btn" id="atras">${siguiente(-1) < 0 ? 'Cancelar' : 'Atrás'}</button>
+          <button type="submit" class="btn primary">${siguiente(1) >= pasos.length ? 'Revisar' : 'Siguiente'}</button>
         </div>
       </form>`;
-    const inp = $('#inp');
-    if (p.type !== 'date' && p.type !== 'select') setTimeout(() => inp.focus(), 50);
-    if (p.type === 'number') {
-      $('#menos').onclick = () => (inp.value = Math.max(0, (parseInt(inp.value, 10) || 0) - 1));
-      $('#mas').onclick = () => (inp.value = (parseInt(inp.value, 10) || 0) + 1);
-    }
-    view.querySelectorAll('[data-v]').forEach(c => (c.onclick = () => { inp.value = c.dataset.v; inp.focus(); }));
-    view.querySelectorAll('[data-dias]').forEach(c => (c.onclick = () => {
-      inp.value = c.dataset.dias ? sumarDias(valores.fecha || hoy(), Number(c.dataset.dias)) : '';
+    const primero = campos.find(c => !['date', 'select', 'choice'].includes(c.type));
+    if (unico && primero) setTimeout(() => $('#inp-' + primero.key)?.focus(), 50);
+    view.querySelectorAll('[data-step]').forEach(b => (b.onclick = () => {
+      const inp = b.parentNode.querySelector('input');
+      inp.value = Math.max(0, (parseInt(inp.value, 10) || 0) + Number(b.dataset.step));
     }));
-    $('#atras').onclick = () => (i === 0 ? salir() : (guardarValor(), i--, paso()));
+    view.querySelectorAll('.chip[data-v]').forEach(b => (b.onclick = () => { const inp = $('#inp-' + b.dataset.for); inp.value = b.dataset.v; inp.focus(); }));
+    view.querySelectorAll('.chip[data-dias]').forEach(b => (b.onclick = () => {
+      $('#inp-' + b.dataset.for).value = b.dataset.dias ? sumarDias(valores.fecha || hoy(), Number(b.dataset.dias)) : '';
+    }));
+    // Una opción elegida puede mostrar u ocultar otros campos: se vuelve a dibujar el paso.
+    view.querySelectorAll('.choice button').forEach(b => (b.onclick = () => {
+      guardar(); valores[b.closest('.choice').dataset.key] = b.dataset.val; paso();
+    }));
+    $('#atras').onclick = atras;
+    $('#wform').onchange = () => {
+      guardar();
+      campos.filter(c => c.defFn && valores[c.key] === c._propuesto).forEach(c => {
+        c._propuesto = c.defFn(valores);
+        valores[c.key] = c._propuesto;
+        const el = $('#inp-' + c.key); if (el) el.value = c._propuesto;
+      });
+    };
     $('#wform').onsubmit = e => {
       e.preventDefault();
-      const v = guardarValor();
-      let err = '';
-      if (p.required && (v === '' || v == null)) err = 'Este dato es obligatorio.';
-      else if (p.type === 'number' && (!Number.isInteger(v) || v < 0)) err = 'Ingrese un número entero igual o mayor a 0.';
-      else if (p.validate) { const r = p.validate(v, valores); if (r !== true) err = r; }
-      if (err) { $('#err').textContent = err; inp.focus(); return; }
-      if (i < pasos.length - 1) { i++; paso(); } else resumen();
+      guardar();
+      let ok = true;
+      for (const c of campos) {
+        const v = valores[c.key];
+        let err = '';
+        if (c.required && (v === '' || v == null || Number.isNaN(v))) err = 'Este dato es obligatorio.';
+        else if (c.type === 'number' && v !== '' && v != null && (Number.isNaN(v) || v < 0)) err = 'Ingrese un número igual o mayor a 0.';
+        else if (c.type === 'number' && unico && c.entero !== false && v !== '' && !Number.isInteger(v)) err = 'Ingrese un número entero.';
+        else if (c.validate && v !== '' && v != null) { const r = c.validate(v, valores); if (r !== true) err = r; }
+        $('#err-' + c.key).textContent = err;
+        if (err && ok) { ok = false; $('#inp-' + c.key)?.focus(); }
+      }
+      if (!ok) return;
+      const j = siguiente(1);
+      if (j >= pasos.length) resumen(); else { i = j; paso(); }
     };
   }
 
-  function guardarValor() {
-    const p = pasos[i];
-    const raw = $('#inp').value;
-    const v = p.type === 'number' ? (raw === '' ? NaN : Number(raw)) : raw.trim();
-    valores[p.key] = v;
-    return v;
+  function atras() {
+    guardar();
+    const j = siguiente(-1);
+    if (j < 0) salir(); else { i = j; paso(); }
   }
 
-  const mostrar = (p, v) => (p.type === 'date' ? fmtFecha(v) : v === '' || v == null ? '—' : esc(v));
+  function guardar() {
+    camposDe(pasos[i]).filter(aplica).forEach(c => {
+      const el = $('#inp-' + c.key);
+      if (!el) return;
+      const raw = el.value;
+      valores[c.key] = c.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw.trim();
+    });
+  }
+
+  function mostrar(c, v) {
+    if (v === '' || v == null) return '—';
+    if (c.type === 'date') return fmtFecha(v);
+    if (c.type === 'select' || c.type === 'choice') { const o = opcionesDe(c).find(([x]) => x === v); return esc(o ? o[1] : v); }
+    return esc(v);
+  }
 
   function resumen() {
-    setHeader(titulo, () => paso());
+    // "Volver" desde la revisión lleva al último paso que corresponde.
+    setHeader(titulo, () => { i = [...pasos.keys()].filter(k => aplica(pasos[k])).pop(); paso(); });
     view.innerHTML = `
       <div class="card">
         <h2>Revise los datos</h2>
-        ${pasos.map((p, k) => `
-          <div class="label">${esc(p.q.replace(/^¿|\?$/g, ''))}</div>
+        ${pasos.map((p, k) => (aplica(p) ? camposDe(p).filter(aplica).map(c => `
+          <div class="label">${esc((c.label || '').replace(/^¿|\?$/g, ''))}</div>
           <div class="value row-between">
-            <span style="white-space:pre-wrap">${mostrar(p, valores[p.key])}</span>
+            <span style="white-space:pre-wrap">${mostrar(c, valores[c.key])}</span>
             <button class="chip" data-k="${k}">Editar</button>
-          </div>`).join('')}
+          </div>`).join('') : '')).join('')}
       </div>
       <div class="wizard-nav">
         <button class="btn" id="cancelar">Cancelar</button>
@@ -323,10 +417,17 @@ function startWizard(pasos, datos, onFinish, titulo, onCancel) {
       </div>`;
     view.querySelectorAll('[data-k]').forEach(b => (b.onclick = () => { i = Number(b.dataset.k); paso(); }));
     $('#cancelar').onclick = salir;
-    $('#confirmar').onclick = () => onFinish(valores);
+    $('#confirmar').onclick = () => {
+      // Los campos que no corresponden (por ejemplo, datos de venta en un alquiler) se vacían.
+      // Un mismo dato (por ejemplo, la fecha) puede aparecer en varios pasos alternativos: se conserva si alguno corresponde.
+      const usados = new Set();
+      pasos.forEach(p => { if (aplica(p)) camposDe(p).forEach(c => { if (aplica(c)) usados.add(c.key); }); });
+      pasos.forEach(p => camposDe(p).forEach(c => { if (!usados.has(c.key)) valores[c.key] = ''; }));
+      onFinish(valores);
+    };
   }
 
-  paso();
+  if (opts.resumen) resumen(); else paso();
 }
 
 function guardarNuevoMedico(v) {
@@ -377,6 +478,7 @@ function renderDetalle(id) {
           ${v.notas ? `<p>${esc(v.notas)}</p>` : ''}
         </div>`).join('')}
     </div>
+    ${bloquePacientesMedico(m)}
     <div class="actions">
       <button class="btn" id="btn-editar">Editar datos</button>
       <button class="btn danger" id="btn-borrar">Eliminar</button>
@@ -391,6 +493,7 @@ function renderDetalle(id) {
     'Próxima visita', () => renderDetalle(m.id));
   $('#btn-editar').onclick = () => renderEditar(m.id);
   if ($('#btn-editar2')) $('#btn-editar2').onclick = () => renderEditar(m.id);
+  view.querySelectorAll('[data-pac]').forEach(b => (b.onclick = () => renderDetallePaciente(b.dataset.pac, () => renderDetalle(m.id))));
   $('#btn-borrar').onclick = () => {
     if (confirm(`¿Eliminar a ${m.nombre} y todo su historial? Esta acción no se puede deshacer.`)) {
       // Se conserva una marca de borrado para que la eliminación llegue a los demás dispositivos.
@@ -567,28 +670,7 @@ async function cargarLogo() {
 async function generarPDF(f) {
   if (!window.jspdf) { toast('No se pudo cargar el generador de PDF.'); return; }
   const { filas, rango } = filasInforme(f);
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  const pageW = doc.internal.pageSize.getWidth();
-
-  let x = 14;
-  const logo = await cargarLogo();
-  if (logo) {
-    let h = 16, w = (logo.w / logo.h) * h;
-    if (w > 45) { w = 45; h = (logo.h / logo.w) * w; }
-    doc.addImage(logo.url, 'JPEG', 14, 7, w, h);
-    x = 14 + w + 5;
-  }
-  doc.setFontSize(16); doc.setTextColor(10, 31, 99);
-  doc.text('Alveon – Oxigenoterapia', x, 15);
-  doc.setFontSize(11); doc.setTextColor(60);
-  doc.text('Registro de visitas a médicos', x, 21.5);
-  doc.setFontSize(9);
-  doc.text(`Fecha de emisión: ${fmtFecha(hoy())}`, pageW - 14, 15, { align: 'right' });
-  if (db.config.representante) doc.text(`Representante: ${db.config.representante}`, pageW - 14, 21.5, { align: 'right' });
-  const desc = descripcionFiltros(f);
-  let y = 27;
-  if (desc) { doc.setTextColor(90); doc.text(desc, 14, y); y += 3; }
+  const { doc, y, pageW } = await nuevoPDF('landscape', 'Registro de visitas a médicos', descripcionFiltros(f));
 
   const conPeriodo = !!rango;
   const head = ['Nombre', 'Institución', 'Fecha última visita', 'Pacientes referidos (total)']
@@ -623,16 +705,56 @@ async function generarPDF(f) {
     }
   });
 
-  const nombre = `alveon-visitas-${hoy()}.pdf`;
+  await entregarPDF(doc, `alveon-visitas-${hoy()}.pdf`, 'Registro de visitas – Alveon');
+}
+
+/* Crea un PDF A4 con el encabezado de Alveon. Devuelve el documento y la altura donde continuar. */
+async function nuevoPDF(orientacion, subtitulo, descripcion) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: orientacion, unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  let x = 14;
+  const logo = await cargarLogo();
+  if (logo) {
+    let h = 16, w = (logo.w / logo.h) * h;
+    if (w > 45) { w = 45; h = (logo.h / logo.w) * w; }
+    doc.addImage(logo.url, 'JPEG', 14, 7, w, h);
+    x = 14 + w + 5;
+  }
+  doc.setFontSize(16); doc.setTextColor(10, 31, 99);
+  doc.text('Alveon – Oxigenoterapia', x, 15);
+  doc.setFontSize(11); doc.setTextColor(60);
+  doc.text(subtitulo, x, 21.5);
+  doc.setFontSize(9);
+  doc.text(`Fecha de emisión: ${fmtFecha(hoy())}`, pageW - 14, 15, { align: 'right' });
+  if (db.config.representante) doc.text(`Representante: ${db.config.representante}`, pageW - 14, 21.5, { align: 'right' });
+  let y = 27;
+  if (descripcion) {
+    doc.setTextColor(90);
+    const lineas = doc.splitTextToSize(descripcion, pageW - 28);
+    doc.text(lineas, 14, y); y += 3 + (lineas.length - 1) * 4;
+  }
+  return { doc, y, pageW };
+}
+
+/* En el celular ofrece compartir (WhatsApp, correo, Drive); si no está disponible, descarga el archivo. */
+async function entregarPDF(doc, nombre, titulo) {
   const blob = doc.output('blob');
   const file = new File([blob], nombre, { type: 'application/pdf' });
-  // En el celular se ofrece compartir (WhatsApp, correo, Drive); si no está disponible, se descarga.
   if (navigator.canShare && navigator.canShare({ files: [file] }) && /Android|iPhone|iPad/i.test(navigator.userAgent)) {
-    try { await navigator.share({ files: [file], title: 'Registro de visitas – Alveon' }); return; }
+    try { await navigator.share({ files: [file], title: titulo }); return; }
     catch (e) { if (e.name === 'AbortError') return; }
   }
   descargar(blob, nombre);
   toast('PDF generado.');
+}
+
+/* Número de página al pie. */
+function piePagina(doc, nota) {
+  const w = doc.internal.pageSize.getWidth(), h = doc.internal.pageSize.getHeight();
+  doc.setFontSize(8); doc.setTextColor(120);
+  doc.text(`Página ${doc.internal.getNumberOfPages()}`, w - 14, h - 8, { align: 'right' });
+  if (nota) doc.text(nota, 14, h - 8);
 }
 
 /* ---------- Sincronización con Google Drive ---------- */
@@ -669,7 +791,7 @@ async function sincronizar(interactivo) {
   }
 }
 
-let refrescarVista = () => renderHome();
+let refrescarVista = () => irInicio();
 
 function pintarNube() {
   const b = $('#btn-sync');
@@ -684,7 +806,7 @@ function pintarNube() {
 /* ---------- Instalación como aplicación ---------- */
 let eventoInstalar = null;
 const instalada = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); eventoInstalar = e; if ($('#lista') || $('#btn-nuevo')) renderHome(); });
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); eventoInstalar = e; if ($('#btn-nuevo')) irInicio(); });
 window.addEventListener('appinstalled', () => { eventoInstalar = null; toast('Aplicación instalada.'); });
 
 function bannerInstalar() {
@@ -694,12 +816,12 @@ function bannerInstalar() {
 }
 function conectarInstalar() {
   const b = $('#btn-instalar');
-  if (b) b.onclick = async () => { eventoInstalar.prompt(); await eventoInstalar.userChoice; eventoInstalar = null; renderHome(); };
+  if (b) b.onclick = async () => { eventoInstalar.prompt(); await eventoInstalar.userChoice; eventoInstalar = null; irInicio(); };
 }
 
 /* ---------- Ajustes ---------- */
 function renderAjustes() {
-  setHeader('Ajustes', () => renderHome());
+  setHeader('Ajustes', () => irInicio());
   const cidFijo = !!(window.ALVEON_CONFIG || {}).googleClientId;
   view.innerHTML = `
     <form class="card" id="fcfg">
@@ -708,6 +830,18 @@ function renderAjustes() {
         <input class="field" id="c-rep" value="${esc(db.config.representante)}"></div>
       <div class="form-row"><label for="c-frec">Frecuencia de visita deseada (días)</label>
         <input class="field" id="c-frec" type="number" inputmode="numeric" min="1" value="${esc(frecuencia())}"></div>
+      <h2 style="margin-top:18px">Pacientes</h2>
+      <div class="form-row"><label for="c-fpac">Frecuencia de control de pacientes (días)</label>
+        <input class="field" id="c-fpac" type="number" inputmode="numeric" min="1" value="${esc(db.config.frecControlPac)}"></div>
+      <p class="hint">Intervalos de mantenimiento: ajústelos según el manual del fabricante de cada equipo.</p>
+      <div class="grid2">
+        <div class="form-row"><label for="c-mdc">Concentrador: cada (días)</label>
+          <input class="field" id="c-mdc" type="number" inputmode="numeric" min="1" value="${esc(db.config.mantDiasConc)}"></div>
+        <div class="form-row"><label for="c-mhc">o cada (horas de uso)</label>
+          <input class="field" id="c-mhc" type="number" inputmode="numeric" min="0" value="${esc(db.config.mantHorasConc)}"></div>
+      </div>
+      <div class="form-row"><label for="c-mdp">CPAP: servicio cada (días)</label>
+        <input class="field" id="c-mdp" type="number" inputmode="numeric" min="1" value="${esc(db.config.mantDiasCpap)}"></div>
       <button class="btn primary" type="submit">Guardar ajustes</button>
     </form>
 
@@ -734,7 +868,7 @@ function renderAjustes() {
 
     <div class="card">
       <h2>Copia de seguridad manual</h2>
-      <p class="hint">Archivo JSON con todos los datos, para guardar o pasar a otro equipo.</p>
+      <p class="hint">Archivo JSON con todos los datos (médicos y pacientes), para guardar o pasar a otro equipo.</p>
       <div class="actions">
         <button class="btn" id="exp">Exportar copia</button>
         <label class="btn" for="imp">Importar copia</label>
@@ -746,15 +880,19 @@ function renderAjustes() {
     e.preventDefault();
     db.config.representante = $('#c-rep').value.trim();
     db.config.frecuenciaDias = Math.max(1, parseInt($('#c-frec').value, 10) || 30);
+    db.config.frecControlPac = Math.max(1, parseInt($('#c-fpac').value, 10) || 30);
+    db.config.mantDiasConc = Math.max(1, parseInt($('#c-mdc').value, 10) || 180);
+    db.config.mantHorasConc = Math.max(0, parseInt($('#c-mhc').value, 10) || 0);
+    db.config.mantDiasCpap = Math.max(1, parseInt($('#c-mdp').value, 10) || 180);
     db.config.actualizado = ahora();
-    save(); toast('Ajustes guardados.'); renderHome();
+    save(); toast('Ajustes guardados.'); irInicio();
   };
   $('#c-sync').onclick = async () => {
     if ($('#c-cid')) { local.clientId = $('#c-cid').value.trim(); guardarLocal(); }
     if (!clientId()) { toast('Primero ingrese el ID de cliente de Google.'); return; }
     refrescarVista = renderAjustes;
     await sincronizar(true);
-    refrescarVista = renderHome;
+    refrescarVista = irInicio;
     renderAjustes();
   };
   if ($('#c-desc')) $('#c-desc').onclick = () => {
@@ -773,7 +911,7 @@ function renderAjustes() {
       if (!d || !Array.isArray(d.medicos)) throw new Error();
       if (!confirm(`El archivo contiene ${d.medicos.filter(m => !m.borrado).length} médico(s). Se combinará con los datos actuales. ¿Continuar?`)) return;
       db = combinar(db, d);
-      save(); toast('Copia importada.'); renderHome();
+      save(); toast('Copia importada.'); irInicio();
     } catch (_) { toast('El archivo no es una copia válida.'); }
   };
 }
@@ -785,13 +923,4 @@ function descargar(blob, nombre) {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
-/* ---------- Inicio ---------- */
-$('#btn-settings').onclick = renderAjustes;
-$('#btn-sync').onclick = () => sincronizar(true);
-window.addEventListener('online', programarSync);
-escribir(STORAGE_KEY, db); // guarda la migración de datos, si hubo
-renderHome();
-pintarNube();
-if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
-}
+/* El inicio de la aplicación está en main.js. */

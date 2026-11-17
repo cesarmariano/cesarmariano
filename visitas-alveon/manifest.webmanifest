@@ -1,7 +1,7 @@
 {
-  "name": "Visitas Alveon – Oxigenoterapia",
-  "short_name": "Visitas Alveon",
-  "description": "Registro de visitas a médicos y pacientes referidos al servicio de oxigenoterapia de Alveon.",
+  "name": "Alveon – Médicos y pacientes",
+  "short_name": "Alveon",
+  "description": "Visitas a médicos y seguimiento de pacientes de oxigenoterapia y CPAP de Alveon.",
   "id": "./index.html",
   "start_url": "./index.html",
   "scope": "./",

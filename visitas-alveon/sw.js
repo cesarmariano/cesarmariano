@@ -1,7 +1,7 @@
 // Permite usar la aplicación sin conexión una vez abierta por primera vez.
-const CACHE = 'visitas-alveon-v4';
+const CACHE = 'visitas-alveon-v5';
 const FILES = [
-  './', './index.html', './instalar.html', './styles.css', './app.js', './config.js', './drive.js',
+  './', './index.html', './instalar.html', './styles.css', './app.js', './config.js', './drive.js', './pacientes.js', './main.js',
   './manifest.webmanifest', './logo.jpg', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
   './lib/jspdf.umd.min.js', './lib/jspdf.plugin.autotable.min.js', './lib/qrcode.js'
 ];
