@@ -25,6 +25,7 @@ const PROVINCIAS = ['Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Có
   'Tierra del Fuego', 'Tucumán'];
 const MONEDAS = ['ARS', 'USD'];
 const REMITENTE_BASE = 'cotizaciones.alveon@gmail.com';
+const VERSION = '1.3 (18/11/2026)';
 
 /* Tipos de actividad. "etapa": etapa comercial a la que avanza la cuenta al registrarla.
    "campos": datos propios del tipo (además de fecha, contactos, detalle y seguimiento). */
@@ -479,7 +480,8 @@ function renderAjustes() {
         <label class="btn" for="imp">Importar copia</label>
       </div>
       <input type="file" id="imp" accept="application/json,.json" hidden>
-    </div>`;
+    </div>
+    <p class="hint small" style="text-align:center">Alveon B2B · versión ${VERSION}</p>`;
   conectarCampos(view);
 
   $('#fcfg').onsubmit = e => {

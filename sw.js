@@ -1,5 +1,5 @@
 // Permite usar la aplicación sin conexión una vez abierta por primera vez.
-const CACHE = 'alveon-b2b-v3';
+const CACHE = 'alveon-b2b-v4';
 const FILES = [
   './', './index.html', './instalar.html', './styles.css', './config.js', './drive.js', './app.js', './cuentas.js',
   './agenda.js', './difusion.js', './informes.js', './main.js',
@@ -8,7 +8,7 @@ const FILES = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -23,12 +23,13 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    // "no-cache": siempre se consulta a GitHub si hay una versión nueva (sin usar la copia guardada por el navegador).
+    fetch(e.request, { cache: 'no-cache' })
       .then(res => {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(e.request, copy));
         return res;
       })
-      .catch(() => caches.match(e.request))
+      .catch(() => caches.match(e.request, { ignoreSearch: true }))
   );
 });
