@@ -2,10 +2,57 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0; url=visitas-alveon/">
-  <title>Visitas Alveon</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a1f63">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Alveon B2B">
+  <title>Alveon B2B</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <p><a href="visitas-alveon/">Abrir Visitas Alveon</a></p>
+  <header class="topbar">
+    <button id="btn-back" class="icon-btn" aria-label="Volver" hidden>&larr;</button>
+    <img src="icons/icon-192.png" alt="" class="topbar-logo">
+    <h1 id="title">Cuentas B2B</h1>
+    <button id="btn-sync" class="icon-btn" aria-label="Sincronizar con Google Drive" hidden>&#9729;</button>
+    <button id="btn-settings" class="icon-btn" aria-label="Ajustes">&#9881;</button>
+  </header>
+
+  <main id="view"></main>
+
+  <nav id="bottom-nav" aria-label="Secciones">
+    <button data-sec="cuentas">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16M15 9h4a1 1 0 0 1 1 1v11M2 21h20M8 8h3M8 12h3M8 16h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      Cuentas
+    </button>
+    <button data-sec="agenda">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 10h18M8 3v4M16 3v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      Agenda
+    </button>
+    <button data-sec="difusion">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h3l6 4V6L7 10H4a1 1 0 0 0-1 1zM17 8a5 5 0 0 1 0 8M20 5a9 9 0 0 1 0 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Difusión
+    </button>
+    <button data-sec="informes">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h9l5 5v15H6zM14 2v6h6M9 17v-3M12 17v-6M15 17v-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Informes
+    </button>
+  </nav>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="lib/jspdf.umd.min.js"></script>
+  <script src="lib/jspdf.plugin.autotable.min.js"></script>
+  <script src="config.js"></script>
+  <script src="drive.js"></script>
+  <script src="app.js"></script>
+  <script src="cuentas.js"></script>
+  <script src="agenda.js"></script>
+  <script src="difusion.js"></script>
+  <script src="informes.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>

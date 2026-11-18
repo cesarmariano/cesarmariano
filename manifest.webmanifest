@@ -1,8 +1,8 @@
 {
-  "name": "Alveon – Médicos y pacientes",
-  "short_name": "Alveon",
-  "description": "Visitas a médicos y seguimiento de pacientes de oxigenoterapia y CPAP de Alveon.",
-  "id": "./index.html",
+  "name": "Alveon B2B – Desarrollo de negocios",
+  "short_name": "Alveon B2B",
+  "description": "Seguimiento comercial de obras sociales, hospitales, sanatorios, clínicas y otros prestadores de Alveon.",
+  "id": "./index.html?app=b2b",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

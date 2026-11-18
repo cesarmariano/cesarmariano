@@ -1,7 +1,8 @@
 // Permite usar la aplicación sin conexión una vez abierta por primera vez.
-const CACHE = 'visitas-alveon-v6';
+const CACHE = 'alveon-b2b-v1';
 const FILES = [
-  './', './index.html', './instalar.html', './styles.css', './app.js', './config.js', './drive.js', './pacientes.js', './main.js',
+  './', './index.html', './instalar.html', './styles.css', './config.js', './drive.js', './app.js', './cuentas.js',
+  './agenda.js', './difusion.js', './informes.js', './main.js',
   './manifest.webmanifest', './logo.jpg', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
   './lib/jspdf.umd.min.js', './lib/jspdf.plugin.autotable.min.js', './lib/qrcode.js'
 ];
@@ -13,7 +14,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k.startsWith('alveon-b2b-') && k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });

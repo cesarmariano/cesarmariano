@@ -191,3 +191,54 @@ body.con-nav #toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
 .pill.info { background: rgba(10,71,184,.12); color: var(--brand); }
 .choice.multi button { flex: 1 1 calc(25% - 8px); min-width: 64px; }
 .pills { min-width: 0; } .pills .pill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+
+/* Alveon B2B */
+main { max-width: 760px; }
+.mt { margin-top: 16px; } .mt0 { margin-top: 0; } .mb { margin-bottom: 10px; }
+.small { font-size: .85rem; }
+.hint.small { margin: 0 0 6px; font-size: .85rem; }
+.pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+textarea.field.tall { min-height: 170px; }
+.field.compact { min-height: 44px; padding: 8px 10px; font-size: .95rem; }
+.field.auto { width: auto; max-width: 60%; }
+.filtros { margin-bottom: 10px; }
+.btn.small { min-height: 38px; padding: 0 12px; font-size: .9rem; width: auto; border-radius: 8px; }
+.btn.mail { background: #c5221f; border-color: #c5221f; color: #fff; }
+.btn.wa.small, .btn.mail.small { font-weight: 700; }
+.chips.scroll { flex-wrap: nowrap; overflow-x: auto; margin: 0 0 10px; padding-bottom: 4px; scrollbar-width: thin; }
+.chips.scroll .chip { flex: none; }
+.chips.multi { margin-top: 0; }
+.pill.decisor { background: rgba(10,71,184,.14); color: var(--brand); }
+.titulo-cuenta { font-size: 1.3rem; margin: 4px 0 8px; }
+.contacto { border-top: 1px solid var(--border); padding: 12px 0; }
+.contacto:first-of-type { border-top: 0; }
+.contacto .name { font-weight: 600; }
+.contacto .sub, .agenda-item .sub, .dest .sub { color: var(--muted); }
+.com-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.visit.act { cursor: pointer; border-radius: 8px; }
+.visit.act:hover { background: rgba(10,71,184,.04); }
+.visit .pills .btn.small { min-height: 30px; padding: 0 10px; font-size: .8rem; }
+.tipo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.agenda-item { border-top: 1px solid var(--border); padding: 10px 0; cursor: pointer; }
+.agenda-item:first-of-type { border-top: 0; }
+.agenda-item .name { font-weight: 600; }
+.agenda-item .pills .btn.small { min-height: 30px; padding: 0 10px; font-size: .8rem; }
+.dest-lista { max-height: 60vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; padding: 4px 10px; }
+.dest-grupo { border-top: 1px solid var(--border); padding: 8px 0; }
+.dest-grupo:first-child { border-top: 0; }
+.dest-cab, .dest { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; cursor: pointer; }
+.dest { padding-left: 28px; }
+.dest .sub { display: block; }
+.dest.off { opacity: .55; cursor: default; }
+.dest-cab input, .dest input { width: 20px; height: 20px; flex: none; margin-top: 2px; }
+.wa-fila { display: flex; justify-content: space-between; align-items: center; gap: 10px; border-top: 1px solid var(--border); padding: 8px 0; }
+.wa-fila .sub { display: block; }
+.choice.vertical { flex-direction: column; }
+.choice.vertical button { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 2px; }
+.choice.vertical small { font-weight: 400; color: var(--muted); font-size: .85rem; }
+#bottom-nav { grid-template-columns: repeat(4, 1fr); }
+.toast-btn { margin-left: 10px; background: #fff; color: #0a1f63; border: 0; border-radius: 6px; padding: 6px 10px; font-weight: 700; cursor: pointer; }
+.btn.danger { margin-bottom: 24px; }
+a { color: var(--brand); }
+@media (prefers-color-scheme: dark) { a { color: #7fa8ff; } }
+.doc-item .pills .pill { flex: none; } /* la clase "info" de las etiquetas no debe heredar el ancho de .doc-item .info */

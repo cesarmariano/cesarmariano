@@ -1,12 +1,13 @@
 /* Sincronización y respaldos en Google Drive del usuario.
    Usa el permiso "drive.file": la aplicación sólo ve los archivos que ella misma crea.
-   Estructura en Drive:  Alveon Visitas/alveon-visitas.json  (+ respaldos diarios con fecha). */
+   Estructura en Drive:  Alveon B2B/alveon-b2b.json  (+ respaldos diarios con fecha).
+   Es una carpeta distinta de la aplicación de visitas médicas (Alveon Visitas): los datos no se mezclan. */
 'use strict';
 
 const Drive = (() => {
   const SCOPE = 'https://www.googleapis.com/auth/drive.file';
-  const CARPETA = 'Alveon Visitas';
-  const ARCHIVO = 'alveon-visitas.json';
+  const CARPETA = 'Alveon B2B';
+  const ARCHIVO = 'alveon-b2b.json';
   const API = 'https://www.googleapis.com/drive/v3';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
   let token = null, vence = 0, tokenClient = null, gisPromise = null;
@@ -69,7 +70,7 @@ const Drive = (() => {
   }
 
   async function crear(nombre, contenido, padre) {
-    const limite = 'alveon' + Math.random().toString(36).slice(2);
+    const limite = 'alveonb2b' + Math.random().toString(36).slice(2);
     const cuerpo = `--${limite}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
       JSON.stringify({ name: nombre, parents: [padre], mimeType: 'application/json' }) +
       `\r\n--${limite}\r\nContent-Type: application/json\r\n\r\n${contenido}\r\n--${limite}--`;
@@ -95,7 +96,7 @@ const Drive = (() => {
       const r = await api(`${API}/files/${existentes[0].id}?alt=media`);
       let remoto = null;
       try { remoto = await r.json(); } catch (_) { /* archivo dañado: se reemplaza */ }
-      if (remoto && Array.isArray(remoto.medicos)) datos = combinar(local, remoto);
+      if (remoto && Array.isArray(remoto.cuentas)) datos = combinar(local, remoto);
       await actualizar(existentes[0].id, JSON.stringify(datos));
     } else {
       await crear(ARCHIVO, JSON.stringify(datos), padre);
