@@ -8,7 +8,7 @@ Es un proyecto independiente de la aplicación de visitas médicas y seguimiento
 
 ### Cuentas (instituciones)
 - Nombre, tipo, etapa comercial, provincia, ciudad, dirección, teléfono, WhatsApp, correo general, sitio web, CUIT, productos de interés y notas.
-- Etapas: Prospecto → Contacto inicial → Reuniones → Propuesta técnico-económica → Licitación → Negociación → Cliente (o Perdida / sin interés). La etapa avanza sola al registrar actividades y puede cambiarse a mano.
+- Etapas: Prospecto → Contacto inicial → Reuniones → Cotización → Licitación → Negociación → Cliente (o Perdida / sin interés). La etapa avanza sola al registrar actividades y puede cambiarse a mano.
 - Lista con búsqueda (institución, contacto, cargo, ciudad), filtros por etapa, tipo y provincia, y orden por seguimiento, última actividad o nombre.
 
 ### Contactos (uno o varios por cuenta)
@@ -17,11 +17,11 @@ Es un proyecto independiente de la aplicación de visitas médicas y seguimiento
 - El correo se abre como mensaje nuevo desde la cuenta **cotizaciones.alveon@gmail.com**. Después de abrirlo se ofrece registrarlo como actividad.
 
 ### Actividades
-Contacto inicial · Reunión · Propuesta técnico-económica (productos, monto, moneda, validez, estado) · Licitación (expediente, tipo, apertura, monto, estado) · Venta · Alquiler (cuota mensual, inicio y fin del contrato) · Garantía (equipo, serie, vencimiento) · Soporte técnico · Consulta · Llamada · Correo · WhatsApp · Otra.
+Contacto inicial · Reunión · Cotización (productos, monto, moneda, validez, estado) · Licitación (expediente, tipo, apertura, monto, estado) · Venta · Alquiler (cuota mensual, inicio y fin del contrato) · Garantía (equipo, serie, vencimiento) · Soporte técnico · Consulta · Llamada · Correo · WhatsApp · Otra.
 Cada actividad registra fecha, contactos que participaron, detalle y un **seguimiento** (fecha y próximo paso).
 
 ### Agenda
-Seguimientos pendientes, licitaciones en curso con fecha de apertura, propuestas por vencer o sin respuesta, contratos de alquiler y garantías por vencer, y casos de soporte o consultas abiertos.
+Seguimientos pendientes, licitaciones en curso con fecha de apertura, cotizaciones por vencer o sin respuesta, contratos de alquiler y garantías por vencer, y casos de soporte o consultas abiertos.
 
 ### Difusión masiva
 - **Correo**: se elige la lista de destinatarios tildando contactos (filtros por tipo, etapa, provincia, decisores y producto de interés). Se abre un correo dirigido a cotizaciones.alveon@gmail.com con todos los elegidos en **copia oculta (CCO)**. Si son muchos, se divide en varios correos (50 por correo, configurable). También se pueden copiar las direcciones.
@@ -29,7 +29,7 @@ Seguimientos pendientes, licitaciones en curso con fecha de apertura, propuestas
 - La difusión puede registrarse como actividad en cada cuenta alcanzada.
 
 ### Informes
-- PDF: listado de cuentas; actividades del período; propuestas, licitaciones, ventas y alquileres con totales por moneda; ficha completa de cada cuenta.
+- PDF: listado de cuentas; actividades del período; cotizaciones, licitaciones, ventas y alquileres con totales por moneda; ficha completa de cada cuenta.
 - CSV de contactos para Excel o Google Contactos.
 
 ### Ajustes

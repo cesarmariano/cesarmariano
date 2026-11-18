@@ -19,8 +19,8 @@ function renderInformes() {
       <h2>Informe</h2>
       <div class="choice vertical" data-choice="i-informe">
         ${[['cuentas', 'Listado de cuentas', 'Etapa, contactos decisores, última actividad y próximo seguimiento.'],
-           ['actividades', 'Actividades del período', 'Contactos, reuniones, propuestas, licitaciones, ventas, alquileres, garantías, soporte y consultas.'],
-           ['negocios', 'Propuestas, licitaciones, ventas y alquileres', 'Montos y estados, con totales por moneda.'],
+           ['actividades', 'Actividades del período', 'Contactos, reuniones, cotizaciones, licitaciones, ventas, alquileres, garantías, soporte y consultas.'],
+           ['negocios', 'Cotizaciones, licitaciones, ventas y alquileres', 'Montos y estados, con totales por moneda.'],
            ['contactos', 'Contactos (archivo CSV)', 'Para abrir en Excel o importar en Google Contactos.']]
           .map(([k, l, d]) => `<button type="button" class="${f.informe === k ? 'on' : ''}" data-val="${k}"><b>${l}</b><small>${d}</small></button>`).join('')}
       </div>
@@ -118,7 +118,7 @@ async function pdfActividades(soloNegocios) {
   }));
   if (!filas.length) { toast('No hay actividades con esos filtros.'); return; }
   filas.sort((x, y) => x.a.fecha.localeCompare(y.a.fecha) || x.c.nombre.localeCompare(y.c.nombre, 'es'));
-  const titulo = soloNegocios ? 'Propuestas, licitaciones, ventas y alquileres' : 'Actividades comerciales';
+  const titulo = soloNegocios ? 'Cotizaciones, licitaciones, ventas y alquileres' : 'Actividades comerciales';
   const { doc, y } = await nuevoPDF('landscape', titulo, descripcionFiltros(true));
 
   if (soloNegocios) {

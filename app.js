@@ -11,7 +11,7 @@ const TIPOS_CUENTA = ['Obra social', 'Prepaga', 'Hospital público', 'Hospital p
   'Distribuidor / proveedor', 'Otro'];
 const ETAPAS = [
   ['prospecto', 'Prospecto'], ['contacto', 'Contacto inicial'], ['reunion', 'Reuniones'],
-  ['propuesta', 'Propuesta técnico-económica'], ['licitacion', 'Licitación'], ['negociacion', 'Negociación'],
+  ['propuesta', 'Cotización'], ['licitacion', 'Licitación'], ['negociacion', 'Negociación'],
   ['cliente', 'Cliente'], ['perdida', 'Perdida / sin interés']
 ];
 const ROLES = [['decisor', 'Decisor'], ['influye', 'Influye en la decisión'], ['no', 'No decide']];
@@ -25,7 +25,7 @@ const PROVINCIAS = ['Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Có
   'Tierra del Fuego', 'Tucumán'];
 const MONEDAS = ['ARS', 'USD'];
 const REMITENTE_BASE = 'cotizaciones.alveon@gmail.com';
-const VERSION = '1.5 (18/11/2026)';
+const VERSION = '1.6 (18/11/2026)';
 
 /* Tipos de actividad. "etapa": etapa comercial a la que avanza la cuenta al registrarla.
    "campos": datos propios del tipo (además de fecha, contactos, detalle y seguimiento). */
@@ -39,7 +39,7 @@ const TIPOS_ACT = {
     { k: 'modalidad', l: 'Modalidad', t: 'choice', ops: ['Presencial', 'Virtual', 'Telefónica'] },
     { k: 'lugar', l: 'Lugar o enlace', t: 'text' },
     { k: 'resultado', l: 'Resultado', t: 'choice', ops: ['Positivo', 'Neutro', 'Negativo'] }] },
-  propuesta: { l: 'Propuesta técnico-económica', etapa: 'propuesta', campos: [
+  propuesta: { l: 'Cotización', etapa: 'propuesta', campos: [
     { k: 'numero', l: 'Número o referencia', t: 'text' }, C_PRODUCTOS, C_MONTO, C_MONEDA,
     { k: 'validez', l: 'Válida hasta', t: 'date' },
     { k: 'estado', l: 'Estado', t: 'choice', ops: ['Enviada', 'En evaluación', 'Aceptada', 'Rechazada'], def: 'Enviada' }] },
@@ -437,7 +437,7 @@ function renderAjustes() {
       <h2 class="mt">Catálogo de productos y servicios</h2>
       <div class="form-row"><label for="c-prod">Uno por línea</label>
         <textarea class="field tall" id="c-prod">${esc(productos().join('\n'))}</textarea>
-        <p class="hint small">Se usan en propuestas, licitaciones, ventas, alquileres y en los productos de interés de cada cuenta.</p></div>
+        <p class="hint small">Se usan en cotizaciones, licitaciones, ventas, alquileres y en los productos de interés de cada cuenta.</p></div>
       <button class="btn primary" type="submit">Guardar ajustes</button>
     </form>
 

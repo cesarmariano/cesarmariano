@@ -1,4 +1,4 @@
-/* Agenda: seguimientos, licitaciones, propuestas, contratos, garantías y casos de soporte pendientes. */
+/* Agenda: seguimientos, licitaciones, cotizaciones, contratos, garantías y casos de soporte pendientes. */
 'use strict';
 
 let agendaTodo = false;
@@ -60,11 +60,11 @@ function renderAgenda() {
         <div class="sub">${esc(resumenDatos(it.a))}</div>
         <div class="pills">${pillFecha(it.fecha, 'Apertura')}<span class="pill warn">${esc(it.a.datos.estado)}</span></div></div>`,
       'Sin licitaciones en curso.')}
-    ${bloque('Propuestas por vencer o sin respuesta', g.prop, it => `
+    ${bloque('Cotizaciones por vencer o sin respuesta', g.prop, it => `
       <div class="agenda-item" data-cuenta="${it.c.id}">${cab(it)}
         <div class="sub">${esc(resumenDatos(it.a))}</div>
         <div class="pills">${pillFecha(it.fecha, 'Validez')}<span class="pill warn">${esc(it.a.datos.estado)}</span></div></div>`,
-      agendaTodo ? 'Sin propuestas abiertas.' : 'Sin propuestas por vencer en los próximos 15 días.')}
+      agendaTodo ? 'Sin cotizaciones abiertas.' : 'Sin cotizaciones por vencer en los próximos 15 días.')}
     ${bloque('Contratos de alquiler por vencer', g.alq, it => `
       <div class="agenda-item" data-cuenta="${it.c.id}">${cab(it)}
         <div class="sub">${esc(resumenDatos(it.a))}</div>
