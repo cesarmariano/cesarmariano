@@ -356,6 +356,11 @@ async function sincronizar(interactivo) {
   try {
     if (!Drive.tieneToken()) {
       if (!interactivo) return;
+      if (local.modoAcceso === 'redireccion') {
+        guardarLocal(); escribir(STORAGE_KEY, db);
+        Drive.autorizarRedireccion(clientId(), !local.driveConectado); // la página va a Google y vuelve
+        return;
+      }
       await Drive.autorizar(clientId(), !local.driveConectado);
     }
     const respaldo = local.ultimoRespaldo !== hoy() ? hoy() : null;
@@ -447,8 +452,16 @@ function renderAjustes() {
       <p class="hint small">Dirección de esta página: ${esc(location.origin)}${clientId() ? ` · ID de cliente terminado en …${esc(clientId().split('.')[0].slice(-6))}` : ''}</p>
       <div class="actions">
         <button class="btn primary" id="c-sync">${local.driveConectado ? 'Sincronizar ahora' : 'Conectar Google Drive'}</button>
-        ${local.driveConectado ? '<button class="btn danger" id="c-desc">Desconectar</button>' : ''}
+        ${local.driveConectado ? '<button class="btn danger" id="c-desc">Desconectar</button>' : '<button class="btn" id="c-redir">Conectar sin ventana emergente</button>'}
       </div>
+      <details class="mt"${local.ultimoError && !local.driveConectado ? ' open' : ''}>
+        <summary>Conectar sin ventana emergente (recomendado en Safari, iPhone y aplicación instalada)</summary>
+        <p class="hint small mt">La página va a Google y vuelve sola. Requiere, una sola vez, agregar esta dirección en Google Cloud →
+          Credenciales → su ID de cliente → <b>URI de redireccionamiento autorizados</b>:</p>
+        <p class="codigo" id="c-uri">${esc(Drive.urlRetorno())}</p>
+        <button class="btn small" id="c-copiar-uri" type="button">Copiar dirección</button>
+        <p class="hint small mt">Forma de conexión en este dispositivo: <b>${local.modoAcceso === 'redireccion' ? 'sin ventana emergente' : 'ventana emergente'}</b>.</p>
+      </details>
     </div>
 
     <div class="card">
@@ -490,6 +503,16 @@ function renderAjustes() {
     await sincronizar(true);
     refrescarVista = prev;
     renderAjustes();
+  };
+  if ($('#c-redir')) $('#c-redir').onclick = () => {
+    if ($('#c-cid')) { local.clientId = $('#c-cid').value.trim(); }
+    if (!clientId()) { toast('Primero ingrese el ID de cliente de Google.'); return; }
+    local.modoAcceso = 'redireccion'; guardarLocal();
+    sincronizar(true);
+  };
+  $('#c-copiar-uri').onclick = async () => {
+    try { await navigator.clipboard.writeText(Drive.urlRetorno()); toast('Dirección copiada.'); }
+    catch (_) { prompt('Copie la dirección:', Drive.urlRetorno()); }
   };
   if ($('#c-desc')) $('#c-desc').onclick = () => {
     if (!confirm('¿Desconectar Google Drive en este dispositivo? Los datos locales y los de Drive se conservan.')) return;

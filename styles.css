@@ -243,3 +243,5 @@ a { color: var(--brand); }
 @media (prefers-color-scheme: dark) { a { color: #7fa8ff; } }
 .doc-item .pills .pill { flex: none; } /* la clase "info" de las etiquetas no debe heredar el ancho de .doc-item .info */
 .error-box { background: rgba(179,38,30,.1); color: var(--danger); border-radius: 8px; padding: 10px 12px; font-size: .9rem; overflow-wrap: anywhere; }
+.codigo { font-family: ui-monospace, Menlo, monospace; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; overflow-wrap: anywhere; font-size: .9rem; margin: 0 0 8px; }
+details summary { cursor: pointer; font-weight: 600; color: var(--brand); }

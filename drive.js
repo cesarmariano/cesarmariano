@@ -12,7 +12,47 @@ const Drive = (() => {
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
   let token = null, vence = 0, tokenClient = null, gisPromise = null;
 
+  const TOKEN_KEY = 'alveon-b2b-token', ESTADO_KEY = 'alveon-b2b-oauth-estado';
+  // El permiso de Google dura una hora; se conserva en la pestaña para no pedirlo en cada recarga.
+  try { const t = JSON.parse(sessionStorage.getItem(TOKEN_KEY)); if (t) { token = t.token; vence = t.vence; } } catch (_) { /* sin almacenamiento */ }
+  function guardarToken(t, segundos) {
+    token = t; vence = Date.now() + (Number(segundos) || 3600) * 1000;
+    try { sessionStorage.setItem(TOKEN_KEY, JSON.stringify({ token, vence })); } catch (_) { /* sin almacenamiento */ }
+  }
+
   const tieneToken = () => token && Date.now() < vence - 60000;
+
+  /* ---- Acceso por redirección (sin ventana emergente) ----
+     La página completa va a Google y vuelve a esta misma dirección con el permiso.
+     Requiere que la dirección de retorno figure en "URI de redireccionamiento autorizados" del ID de cliente. */
+  const urlRetorno = () => new URL('./', location.href).href;
+
+  function autorizarRedireccion(clientId, forzarConsentimiento) {
+    if (!clientId) throw new Error('Falta configurar el ID de cliente de Google en Ajustes.');
+    const estado = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    try { localStorage.setItem(ESTADO_KEY, estado); } catch (_) { /* sin almacenamiento */ }
+    const q = new URLSearchParams({
+      client_id: clientId, redirect_uri: urlRetorno(), response_type: 'token', scope: SCOPE,
+      include_granted_scopes: 'true', state: estado
+    });
+    if (forzarConsentimiento) q.set('prompt', 'consent');
+    location.assign('https://accounts.google.com/o/oauth2/v2/auth?' + q.toString());
+  }
+
+  /* Al volver de Google: toma el permiso de la dirección y la limpia.
+     Devuelve null si no se vuelve de Google, { ok: true } o { error: 'mensaje' }. */
+  function recibirRedireccion() {
+    const h = location.hash.startsWith('#') ? new URLSearchParams(location.hash.slice(1)) : null;
+    if (!h || !(h.has('access_token') || h.has('error'))) return null;
+    history.replaceState(null, '', location.pathname + location.search);
+    let esperado = null;
+    try { esperado = localStorage.getItem(ESTADO_KEY); localStorage.removeItem(ESTADO_KEY); } catch (_) { /* sin almacenamiento */ }
+    if (!esperado || h.get('state') !== esperado) return { error: 'La respuesta de Google no corresponde a esta solicitud. Vuelva a intentar.' };
+    if (h.has('error')) return { error: mensajeError(h.get('error'), h.get('error_description')) };
+    if (!String(h.get('scope') || '').includes(SCOPE)) return { error: 'No se otorgó el permiso para Google Drive. Vuelva a conectar y tilde la casilla de acceso a Drive.' };
+    guardarToken(h.get('access_token'), h.get('expires_in'));
+    return { ok: true };
+  }
 
   function cargarGIS() {
     if (window.google?.accounts?.oauth2) return Promise.resolve();
@@ -42,11 +82,11 @@ const Drive = (() => {
           if (!google.accounts.oauth2.hasGrantedAllScopes(r, SCOPE)) {
             return mal(new Error('No se otorgó el permiso para Google Drive. Vuelva a conectar y tilde la casilla de acceso a Drive.'));
           }
-          token = r.access_token; vence = Date.now() + (Number(r.expires_in) || 3600) * 1000;
+          guardarToken(r.access_token, r.expires_in);
           ok();
         },
         error_callback: e => mal(new Error(
-          e?.type === 'popup_closed' ? 'Se cerró la ventana de Google antes de terminar.' :
+          e?.type === 'popup_closed' ? 'Se cerró la ventana de Google antes de terminar. Use "Conectar sin ventana emergente".' :
           e?.type === 'popup_failed_to_open' ? 'El navegador bloqueó la ventana de Google. Permita las ventanas emergentes para cesarmariano.github.io y vuelva a intentar.' :
           'No se pudo abrir la ventana de Google (' + (e?.type || 'error desconocido') + ').'))
       });
@@ -63,7 +103,7 @@ const Drive = (() => {
       invalid_client: 'El ID de cliente de Google no es válido.',
       unauthorized_client: 'El ID de cliente no admite esta página.',
       origin_mismatch: 'Esta dirección no está autorizada en Google Cloud. Agregue https://cesarmariano.github.io en Orígenes autorizados de JavaScript.',
-      redirect_uri_mismatch: 'Esta dirección no está autorizada en Google Cloud. Agregue https://cesarmariano.github.io en Orígenes autorizados de JavaScript.'
+      redirect_uri_mismatch: `Falta autorizar la dirección de retorno. En Google Cloud → Credenciales → su ID de cliente, agregue ${urlRetorno()} en URI de redireccionamiento autorizados.`
     }[codigo];
     return (m || 'Google rechazó el acceso') + ` [${codigo}${detalle ? ': ' + detalle : ''}]`;
   }
@@ -72,7 +112,7 @@ const Drive = (() => {
 
   async function api(url, opts = {}) {
     const r = await fetch(url, { ...opts, headers: { Authorization: 'Bearer ' + token, ...(opts.headers || {}) } });
-    if (r.status === 401) { token = null; throw new Error('La sesión de Google venció. Toque sincronizar nuevamente.'); }
+    if (r.status === 401) { token = null; vence = 0; try { sessionStorage.removeItem(TOKEN_KEY); } catch (_) { /* */ } throw new Error('La sesión de Google venció. Toque sincronizar nuevamente.'); }
     if (!r.ok) throw new Error(`Error de Google Drive (${r.status}).`);
     return r;
   }
@@ -136,7 +176,8 @@ const Drive = (() => {
   function desconectar() {
     if (token && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(token, () => {});
     token = null; vence = 0;
+    try { sessionStorage.removeItem(TOKEN_KEY); } catch (_) { /* sin almacenamiento */ }
   }
 
-  return { autorizar, sincronizar, tieneToken, desconectar, precargar };
+  return { autorizar, autorizarRedireccion, recibirRedireccion, urlRetorno, sincronizar, tieneToken, desconectar, precargar };
 })();
