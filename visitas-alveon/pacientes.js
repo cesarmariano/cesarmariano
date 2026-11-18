@@ -298,6 +298,7 @@ function pasosPaciente(esAlta) {
 
 function guardarNuevoPaciente(v) {
   const p = datosPaciente({ id: uid(), creado: ahora(), estado: 'activo', registros: [] }, v);
+  sellar(p);
   p.registros.push({
     id: uid(), fecha: v.fechaInst || hoy(), tipo: 'instalacion',
     horometro: num(v.horometroInicial), notas: v.notas || ''
@@ -312,9 +313,7 @@ const CAMPOS_PACIENTE = ['nombre', 'dni', 'fechaNac', 'telefono', 'contactoNombr
   'presion', 'mascara', 'alqInicio', 'alqFin', 'cuota', 'estadoPago', 'ventaFecha', 'precio', 'garantiaHasta', 'proximoControl', 'proximoServicio'];
 
 function datosPaciente(p, v) {
-  CAMPOS_PACIENTE.forEach(k => { p[k] = v[k] ?? ''; });
-  p.actualizado = ahora();
-  return p;
+  return cambiar(p, Object.fromEntries(CAMPOS_PACIENTE.map(k => [k, v[k] ?? ''])));
 }
 
 /* ---------- Ficha del paciente ---------- */
@@ -417,9 +416,8 @@ function renderDetallePaciente(id, volver) {
   }, 'Editar paciente', () => renderDetallePaciente(p.id, volver), { resumen: true });
   if ($('#btn-act')) $('#btn-act').onclick = () => registrarActividad(p, volver);
   if ($('#btn-reactivar')) $('#btn-reactivar').onclick = () => {
-    p.estado = 'activo';
     p.registros.push({ id: uid(), fecha: hoy(), tipo: 'reactivacion', notas: '' });
-    p.actualizado = ahora(); save(); toast('Paciente reactivado.'); renderDetallePaciente(p.id, volver);
+    cambiar(p, { estado: 'activo' }); save(); toast('Paciente reactivado.'); renderDetallePaciente(p.id, volver);
   };
   if ($('#btn-edit2')) $('#btn-edit2').onclick = editar;
   $('#btn-edit').onclick = editar;
@@ -428,13 +426,12 @@ function renderDetallePaciente(id, volver) {
     key: 'proximoControl', q: '¿Cuándo es el próximo control?', type: 'date', quick: true,
     defFn: () => p.proximoControl || sumarDias(hoy(), frecControl())
   }], { fecha: hoy() }, v => {
-    p.proximoControl = v.proximoControl || ''; p.actualizado = ahora(); save(); renderDetallePaciente(p.id, volver);
+    cambiar(p, { proximoControl: v.proximoControl || '' }); save(); renderDetallePaciente(p.id, volver);
   }, 'Próximo control', () => renderDetallePaciente(p.id, volver));
   $('#btn-ficha').onclick = () => fichaPDF(p);
   $('#btn-borrar').onclick = () => {
     if (!confirm(`¿Eliminar a ${p.nombre} y todo su historial? Esta acción no se puede deshacer.\nSi el paciente dejó el servicio, use "Registrar actividad → Retiro del equipo" para conservar el historial.`)) return;
-    Object.keys(p).forEach(k => { if (k !== 'id') delete p[k]; });
-    Object.assign(p, { borrado: true, registros: [], actualizado: ahora() });
+    marcarBorrado(p, 'registros');
     save(); toast('Paciente eliminado.'); renderPacientes();
   };
 }
@@ -520,11 +517,12 @@ function registrarActividad(p, volver) {
     ['medio', 'fuente', 'horometro', 'horasDia', 'pct4h', 'horasNoche', 'iah', 'insumo', 'monto', 'periodo', 'descripcion', 'notas']
       .forEach(k => { if (v[k] !== '' && v[k] != null) r[k] = v[k]; });
     p.registros.push(r);
-    if (v.tipo === 'servicio') p.proximoServicio = v.proximoServicio || '';
-    if (v.tipo === 'cobro' && v.estadoPago) p.estadoPago = v.estadoPago;
-    if (v.tipo === 'retiro') { p.estado = 'finalizado'; p.proximoControl = ''; }
-    else p.proximoControl = v.proximoControl || '';
-    p.actualizado = ahora(); save();
+    const cambios = {};
+    if (v.tipo === 'servicio') cambios.proximoServicio = v.proximoServicio || '';
+    if (v.tipo === 'cobro' && v.estadoPago) cambios.estadoPago = v.estadoPago;
+    if (v.tipo === 'retiro') Object.assign(cambios, { estado: 'finalizado', proximoControl: '' });
+    else cambios.proximoControl = v.proximoControl || '';
+    cambiar(p, cambios); save();
     toast('Actividad registrada.');
     renderDetallePaciente(p.id, volver);
   }, 'Registrar actividad', () => renderDetallePaciente(p.id, volver));

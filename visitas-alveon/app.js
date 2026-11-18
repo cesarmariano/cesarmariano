@@ -66,10 +66,39 @@ function save() {
 
 const activos = () => db.medicos.filter(m => !m.borrado);
 const findMedico = id => db.medicos.find(m => m.id === id && !m.borrado);
-const tocar = m => (m.actualizado = ahora());
+const vacio = v => v === '' || v == null;
+const igual = (x, y) => (vacio(x) && vacio(y)) || JSON.stringify(x) === JSON.stringify(y);
+
+/* Modifica datos de un médico o paciente registrando cuándo cambió cada campo.
+   Así, al sincronizar, se conserva el cambio más reciente de cada dato y no el de la ficha completa. */
+function cambiar(obj, cambios) {
+  const t = ahora();
+  obj.t = obj.t || {};
+  for (const [k, v] of Object.entries(cambios)) {
+    if (igual(obj[k], v)) continue;
+    obj[k] = v; obj.t[k] = t;
+  }
+  obj.actualizado = t;
+  return obj;
+}
+// Marca todos los campos de un registro nuevo con la fecha de creación.
+function sellar(obj) {
+  const t = obj.actualizado || ahora();
+  obj.t = {};
+  Object.keys(obj).forEach(k => { if (!CAMPOS_SIN_SELLO.includes(k)) obj.t[k] = t; });
+  return obj;
+}
+const CAMPOS_SIN_SELLO = ['id', 't', 'creado', 'actualizado', 'visitas', 'registros', 'horarios'];
+
+// Elimina un médico o paciente dejando una marca de borrado que llega a los demás dispositivos.
+function marcarBorrado(obj, sub) {
+  Object.keys(obj).forEach(k => { if (k !== 'id') delete obj[k]; });
+  const t = ahora();
+  Object.assign(obj, { borrado: true, [sub]: [], actualizado: t, t: { borrado: t } });
+}
 
 /* Combina dos copias de los datos (de distintos dispositivos).
-   Por médico o paciente gana la versión modificada más recientemente; visitas y actividades se unen. */
+   Cada campo conserva su modificación más reciente; visitas, actividades y horarios se unen. */
 function combinar(a, b) {
   a = normalizar(JSON.parse(JSON.stringify(a)));
   b = normalizar(JSON.parse(JSON.stringify(b)));
@@ -85,13 +114,42 @@ function combinarLista(la, lb, sub) {
   const mapa = new Map();
   for (const m of [...la, ...lb]) {
     const prev = mapa.get(m.id);
-    if (!prev) { mapa.set(m.id, m); continue; }
-    const [nuevo, viejo] = (m.actualizado || '') >= (prev.actualizado || '') ? [m, prev] : [prev, m];
-    const items = new Map();
-    [...(viejo[sub] || []), ...(nuevo[sub] || [])].forEach(v => items.set(v.id, v));
-    mapa.set(m.id, { ...nuevo, [sub]: nuevo.borrado ? [] : [...items.values()] });
+    mapa.set(m.id, prev ? combinarFicha(prev, m, sub) : m);
   }
   return [...mapa.values()];
+}
+
+function combinarFicha(a, b, sub) {
+  const ra = a.actualizado || '', rb = b.actualizado || '';
+  const res = { id: a.id, t: {} };
+  const claves = new Set([...Object.keys(a), ...Object.keys(b)].filter(k => !['id', 't', 'actualizado', sub, 'horarios'].includes(k)));
+  // Fecha de un campo: la propia si se registró; en fichas de versiones anteriores (sin fechas por campo), la de la ficha.
+  const fecha = (x, k) => (x.t ? x.t[k] || '' : x.actualizado || '');
+  const propia = (x, k) => !!(x.t && x.t[k]);
+  for (const k of claves) {
+    let deB = fecha(b, k) > fecha(a, k);
+    // Un dato vacío sin fecha propia no borra un dato completo del otro dispositivo.
+    if (deB && !propia(b, k) && vacio(b[k]) && !vacio(a[k])) deB = false;
+    else if (!deB && !propia(a, k) && vacio(a[k]) && !vacio(b[k])) deB = true;
+    const v = deB ? b[k] : a[k];
+    if (v !== undefined) res[k] = v;
+    const tk = deB ? (b.t && b.t[k]) : (a.t && a.t[k]);
+    if (tk) res.t[k] = tk;
+  }
+  res.actualizado = ra > rb ? ra : rb;
+  // Listas: visitas y actividades se unen; en horarios, por cada uno gana su versión más reciente (incluido el borrado).
+  const items = new Map();
+  [...(a[sub] || []), ...(b[sub] || [])].forEach(v => items.set(v.id, v));
+  res[sub] = res.borrado ? [] : [...items.values()];
+  if (a.horarios || b.horarios) {
+    const hs = new Map();
+    [...(a.horarios || []), ...(b.horarios || [])].forEach(h => {
+      const ya = hs.get(h.id);
+      if (!ya || (h.actualizado || '') > (ya.actualizado || '')) hs.set(h.id, h);
+    });
+    res.horarios = [...hs.values()];
+  }
+  return res;
 }
 
 /* ---------- Cálculos ---------- */
@@ -110,7 +168,7 @@ function listaDias(dias) {
 const capitalizar = t => (t ? t[0].toUpperCase() + t.slice(1) : '');
 const rangoHoras = h => (h.desde || h.hasta ? `${h.desde || '…'} a ${h.hasta || '…'} h` : '');
 const diaHoy = () => DIAS[(new Date().getDay() + 6) % 7];
-const ordenHorarios = m => [...(m.horarios || [])].sort((a, b) =>
+const ordenHorarios = m => (m.horarios || []).filter(h => !h.borrado).sort((a, b) =>
   DIAS.indexOf(diasDe(a)[0]) - DIAS.indexOf(diasDe(b)[0]) || String(a.desde).localeCompare(String(b.desde)));
 const horariosHoy = m => ordenHorarios(m).filter(h => diasDe(h).includes(diaHoy()));
 
@@ -477,7 +535,7 @@ function startWizard(pasos, datos, onFinish, titulo, onCancel, opts = {}) {
   if (opts.resumen) resumen(); else paso();
 }
 
-const horarioDe = v => ({ id: v.id || uid(), dias: v.dias, desde: v.desde || '', hasta: v.hasta || '', lugar: v.lugar || '', detalle: v.detalleHorario || '' });
+const horarioDe = v => ({ id: v.id || uid(), dias: v.dias, desde: v.desde || '', hasta: v.hasta || '', lugar: v.lugar || '', detalle: v.detalleHorario || '', actualizado: ahora() });
 
 function guardarNuevoMedico(v) {
   const m = {
@@ -489,6 +547,7 @@ function guardarNuevoMedico(v) {
     visitas: [{ id: uid(), fecha: v.fecha, pacientes: v.pacientes, notas: v.notas || '' }],
     horarios: v.dias ? [horarioDe(v)] : []
   };
+  sellar(m);
   db.medicos.push(m); save();
   toast('Médico guardado.');
   renderDetalle(m.id);
@@ -549,24 +608,25 @@ function renderDetalle(id) {
     </div>`;
   $('#btn-visita').onclick = () => startWizard(pasosVisita(m), {}, v => {
     m.visitas.push({ id: uid(), fecha: v.fecha, pacientes: v.pacientes, notas: v.notas || '' });
-    m.proximaVisita = v.proximaVisita || '';
-    tocar(m); save(); toast('Visita registrada.'); renderDetalle(m.id);
+    cambiar(m, { proximaVisita: v.proximaVisita || '' });
+    save(); toast('Visita registrada.'); renderDetalle(m.id);
   }, 'Nueva visita', () => renderDetalle(m.id));
   $('#btn-prox').onclick = () => startWizard([{ ...pasoProxima(), defFn: () => m.proximaVisita || sumarDias(hoy(), frecuencia()), validate: x => !x || x >= hoy() || 'La fecha debe ser hoy o posterior.' }],
-    { fecha: hoy() }, v => { m.proximaVisita = v.proximaVisita || ''; tocar(m); save(); toast('Próxima visita actualizada.'); renderDetalle(m.id); },
+    { fecha: hoy() }, v => { cambiar(m, { proximaVisita: v.proximaVisita || '' }); save(); toast('Próxima visita actualizada.'); renderDetalle(m.id); },
     'Próxima visita', () => renderDetalle(m.id));
   const editarHorario = h => startWizard([pasoHorario(true, m.institucion)],
     h ? { ...h, detalleHorario: h.detalle } : { institucion: [m.institucion, m.direccion].filter(Boolean).join(', ') },
     v => {
       const nuevo = horarioDe({ ...v, id: h && h.id });
       m.horarios = h ? m.horarios.map(x => (x.id === h.id ? nuevo : x)) : [...(m.horarios || []), nuevo];
-      tocar(m); save(); toast('Horario guardado.'); renderDetalle(m.id);
+      m.actualizado = ahora(); save(); toast('Horario guardado.'); renderDetalle(m.id);
     }, h ? 'Editar horario' : 'Nuevo horario', () => renderDetalle(m.id));
   $('#btn-hor').onclick = () => editarHorario(null);
   view.querySelectorAll('[data-hor-edit]').forEach(b => (b.onclick = () => editarHorario(m.horarios.find(x => x.id === b.dataset.horEdit))));
   view.querySelectorAll('[data-hor-del]').forEach(b => (b.onclick = () => {
     if (!confirm('¿Borrar este horario?')) return;
-    m.horarios = m.horarios.filter(x => x.id !== b.dataset.horDel); tocar(m); save(); renderDetalle(m.id);
+    m.horarios = m.horarios.map(x => (x.id === b.dataset.horDel ? { id: x.id, borrado: true, actualizado: ahora() } : x));
+    m.actualizado = ahora(); save(); renderDetalle(m.id);
   }));
   $('#btn-editar').onclick = () => renderEditar(m.id);
   if ($('#btn-editar2')) $('#btn-editar2').onclick = () => renderEditar(m.id);
@@ -574,8 +634,7 @@ function renderDetalle(id) {
   $('#btn-borrar').onclick = () => {
     if (confirm(`¿Eliminar a ${m.nombre} y todo su historial? Esta acción no se puede deshacer.`)) {
       // Se conserva una marca de borrado para que la eliminación llegue a los demás dispositivos.
-      Object.keys(m).forEach(k => { if (!['id'].includes(k)) delete m[k]; });
-      Object.assign(m, { borrado: true, visitas: [], actualizado: ahora() });
+      marcarBorrado(m, 'visitas');
       save(); toast('Médico eliminado.'); renderHome();
     }
   };
@@ -609,7 +668,7 @@ function renderEditar(id) {
     e.preventDefault();
     const nuevo = Object.fromEntries(campos.map(([k]) => [k, $('#e-' + k).value.trim()]));
     if (!nuevo.nombre || !nuevo.institucion) { $('#err').textContent = 'Nombre e institución son obligatorios.'; return; }
-    Object.assign(m, nuevo); tocar(m); save(); toast('Datos actualizados.'); renderDetalle(id);
+    cambiar(m, nuevo); save(); toast('Datos actualizados.'); renderDetalle(id);
   };
 }
 
