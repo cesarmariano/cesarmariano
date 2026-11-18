@@ -197,3 +197,6 @@ body.con-nav #toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
 .pill.info { background: rgba(10,71,184,.12); color: var(--brand); }
 .choice.multi button { flex: 1 1 calc(25% - 8px); min-width: 64px; }
 .pills { min-width: 0; } .pills .pill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.sync-estado { margin: 0 0 12px; padding: 10px 12px; border-radius: 8px; background: rgba(10,71,184,.08); color: var(--brand); font-size: .92rem; }
+.sync-estado.error { background: rgba(179,38,30,.1); color: var(--danger); }
+.sync-estado.vacio { display: none; }

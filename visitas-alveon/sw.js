@@ -1,5 +1,5 @@
 // Permite usar la aplicación sin conexión una vez abierta por primera vez.
-const CACHE = 'visitas-alveon-v8';
+const CACHE = 'visitas-alveon-v9';
 const FILES = [
   './', './index.html', './instalar.html', './styles.css', './app.js', './config.js', './drive.js', './pacientes.js', './main.js',
   './manifest.webmanifest', './logo.jpg', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',

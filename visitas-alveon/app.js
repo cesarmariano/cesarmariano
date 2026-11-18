@@ -850,27 +850,38 @@ async function sincronizar(interactivo) {
   try {
     if (!Drive.tieneToken()) {
       if (!interactivo) return;
-      toast('Abriendo la ventana de Google…');
+      estadoSync('Esperando la autorización en la ventana de Google…');
       await Drive.autorizar(clientId(), !local.driveConectado);
-      toast('Sincronizando…');
+      estadoSync('Autorización recibida.');
     }
     const respaldo = local.ultimoRespaldo !== hoy() ? hoy() : null;
-    const datos = await Drive.sincronizar(db, combinar, respaldo);
+    const datos = await Drive.sincronizar(db, combinar, respaldo, estadoSync);
     db = normalizar(datos);
     escribir(STORAGE_KEY, db);
     Object.assign(local, { driveConectado: true, ultimaSync: ahora(), pendiente: false });
     if (respaldo) local.ultimoRespaldo = respaldo;
     guardarLocal();
+    estadoSync('');
     if (interactivo) toast('Datos sincronizados con Google Drive.');
     refrescarVista();
   } catch (e) {
-    if (interactivo) toast(e.message || 'No se pudo sincronizar.', 7000);
+    const msg = e.message || 'No se pudo sincronizar.';
+    estadoSync(msg, true);
+    if (interactivo) toast(msg, 8000);
   } finally {
     sincronizando = false; pintarNube();
   }
 }
 
 let refrescarVista = () => irInicio();
+
+/* Muestra en Ajustes el paso actual de la sincronización o el último error (queda visible hasta resolverlo). */
+let ultimoEstadoSync = { texto: '', error: false };
+function estadoSync(texto, error = false) {
+  ultimoEstadoSync = { texto, error };
+  const el = $('#sync-estado');
+  if (el) { el.textContent = texto; el.className = 'sync-estado' + (error ? ' error' : '') + (texto ? '' : ' vacio'); }
+}
 
 function pintarNube() {
   const b = $('#btn-sync');
@@ -932,6 +943,7 @@ function renderAjustes() {
       <p class="hint">${local.driveConectado
         ? `Conectado. Última sincronización: ${local.ultimaSync ? new Date(local.ultimaSync).toLocaleString('es-AR') : '—'}.`
         : 'No conectado.'}</p>
+      <p id="sync-estado" class="sync-estado${ultimoEstadoSync.error ? ' error' : ''}${ultimoEstadoSync.texto ? '' : ' vacio'}" role="status">${esc(ultimoEstadoSync.texto)}</p>
       <div class="actions">
         <button class="btn primary" id="c-sync">${local.driveConectado ? 'Sincronizar ahora' : 'Conectar Google Drive'}</button>
         ${local.driveConectado ? '<button class="btn danger" id="c-desc">Desconectar</button>' : ''}

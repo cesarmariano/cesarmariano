@@ -43,6 +43,9 @@ const Drive = (() => {
           if (!p) return;
           clearTimeout(p.reloj);
           if (r.error) return p.mal(new Error(mensajeError(r.error)));
+          if (!google.accounts.oauth2.hasGrantedAllScopes(r, SCOPE)) {
+            return p.mal(new Error('Google no otorgó el permiso para Drive. Vuelva a tocar el botón y, en la ventana de Google, marque la casilla "Ver, editar, crear y borrar solo los archivos de Google Drive específicos que use con esta app" antes de tocar Continuar.'));
+          }
           token = r.access_token; vence = Date.now() + (Number(r.expires_in) || 3600) * 1000;
           p.ok();
         },
@@ -82,10 +85,29 @@ const Drive = (() => {
   }
 
   async function api(url, opts = {}) {
-    const r = await fetch(url, { ...opts, headers: { Authorization: 'Bearer ' + token, ...(opts.headers || {}) } });
+    const corte = new AbortController();
+    const reloj = setTimeout(() => corte.abort(), 30000);
+    let r;
+    try {
+      r = await fetch(url, { ...opts, signal: corte.signal, headers: { Authorization: 'Bearer ' + token, ...(opts.headers || {}) } });
+    } catch (e) {
+      throw new Error(e.name === 'AbortError'
+        ? 'Google Drive no respondió en 30 segundos. Verifique la conexión y vuelva a intentar.'
+        : 'No se pudo comunicar con Google Drive. Si usa una extensión de bloqueo de anuncios o de privacidad, desactívela para este sitio.');
+    } finally { clearTimeout(reloj); }
+    if (r.ok) return r;
+    let detalle = '';
+    try { detalle = JSON.stringify(await r.json()); } catch (_) { /* sin detalle */ }
     if (r.status === 401) { token = null; throw new Error('La sesión de Google venció. Toque sincronizar nuevamente.'); }
-    if (!r.ok) throw new Error(`Error de Google Drive (${r.status}).`);
-    return r;
+    if (/accessNotConfigured|SERVICE_DISABLED|has not been used|is disabled/i.test(detalle)) {
+      throw new Error('La API de Google Drive no está habilitada en el proyecto de Google Cloud. Habilítela en console.cloud.google.com/apis/library/drive.googleapis.com (botón "Habilitar"), espere unos minutos y vuelva a intentar.');
+    }
+    if (/insufficient|SCOPE/i.test(detalle)) {
+      token = null;
+      throw new Error('Falta el permiso para Drive. Vuelva a conectar y marque la casilla de Google Drive en la ventana de Google.');
+    }
+    const msg = (detalle.match(/"message":"([^"]+)"/) || [])[1];
+    throw new Error(`Error de Google Drive (${r.status})${msg ? ': ' + msg : ''}.`);
   }
 
   async function buscar(q) {
@@ -122,8 +144,10 @@ const Drive = (() => {
 
   /* Descarga el archivo remoto, combina con los datos locales y sube el resultado.
      combinar(local, remoto) -> datos combinados. Devuelve los datos combinados. */
-  async function sincronizar(local, combinar, respaldoDiario) {
+  async function sincronizar(local, combinar, respaldoDiario, paso = () => {}) {
+    paso('Buscando la carpeta "Alveon Visitas" en Drive…');
     const padre = await carpeta();
+    paso('Leyendo y combinando los datos…');
     const existentes = await buscar(`name='${ARCHIVO}' and '${padre}' in parents`);
     let datos = local;
     if (existentes.length) {
@@ -136,6 +160,7 @@ const Drive = (() => {
       await crear(ARCHIVO, JSON.stringify(datos), padre);
     }
     if (respaldoDiario) {
+      paso('Guardando el respaldo diario…');
       const nombre = `respaldo-${respaldoDiario}.json`;
       const ya = await buscar(`name='${nombre}' and '${padre}' in parents`);
       if (ya.length) await actualizar(ya[0].id, JSON.stringify(datos, null, 1));
