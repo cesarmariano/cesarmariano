@@ -25,7 +25,7 @@ const PROVINCIAS = ['Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Có
   'Tierra del Fuego', 'Tucumán'];
 const MONEDAS = ['ARS', 'USD'];
 const REMITENTE_BASE = 'cotizaciones.alveon@gmail.com';
-const VERSION = '1.3 (18/11/2026)';
+const VERSION = '1.4 (18/11/2026)';
 
 /* Tipos de actividad. "etapa": etapa comercial a la que avanza la cuenta al registrarla.
    "campos": datos propios del tipo (además de fecha, contactos, detalle y seguimiento). */
@@ -184,7 +184,7 @@ function toast(msg, accion, fn) {
   t.innerHTML = esc(msg) + (accion ? ` <button type="button" class="toast-btn">${esc(accion)}</button>` : '');
   if (accion) t.querySelector('button').onclick = () => { t.classList.remove('show'); fn(); };
   t.classList.add('show');
-  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), accion ? 9000 : 3000);
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), accion ? 9000 : 2000);
 }
 
 let seccion = 'cuentas';
