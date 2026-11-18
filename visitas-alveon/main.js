@@ -13,6 +13,8 @@ escribir(STORAGE_KEY, db); // guarda la migración de datos, si hubo
 try { seccion = localStorage.getItem('alveon-seccion') === 'pacientes' ? 'pacientes' : 'medicos'; } catch (_) { /* sin almacenamiento */ }
 irInicio();
 pintarNube();
+// Precarga el acceso de Google para que la ventana se abra en el mismo toque (requisito de Chrome).
+Drive.precargar(clientId()).catch(() => { /* sin conexión: se reintenta al tocar Conectar */ });
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }

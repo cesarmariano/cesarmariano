@@ -133,10 +133,11 @@ const soloDigitos = s => String(s || '').replace(/\D/g, '');
 const unicos = arr => [...new Set(arr.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
 const frecuencia = () => Number(db.config.frecuenciaDias) || 30;
 
-function toast(msg) {
+// Los avisos duran 2 segundos; los mensajes de error, más tiempo para poder leerlos.
+function toast(msg, ms = 2000) {
   const t = $('#toast');
   t.textContent = msg; t.classList.add('show');
-  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2000);
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms);
 }
 let seccion = 'medicos';
 function irInicio() { return seccion === 'pacientes' ? renderPacientes() : renderHome(); }
@@ -849,7 +850,9 @@ async function sincronizar(interactivo) {
   try {
     if (!Drive.tieneToken()) {
       if (!interactivo) return;
+      toast('Abriendo la ventana de Google…');
       await Drive.autorizar(clientId(), !local.driveConectado);
+      toast('Sincronizando…');
     }
     const respaldo = local.ultimoRespaldo !== hoy() ? hoy() : null;
     const datos = await Drive.sincronizar(db, combinar, respaldo);
@@ -861,7 +864,7 @@ async function sincronizar(interactivo) {
     if (interactivo) toast('Datos sincronizados con Google Drive.');
     refrescarVista();
   } catch (e) {
-    if (interactivo) toast(e.message || 'No se pudo sincronizar.');
+    if (interactivo) toast(e.message || 'No se pudo sincronizar.', 7000);
   } finally {
     sincronizando = false; pintarNube();
   }

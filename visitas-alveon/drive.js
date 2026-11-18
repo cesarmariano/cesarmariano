@@ -27,23 +27,58 @@ const Drive = (() => {
     return gisPromise;
   }
 
-  // Debe llamarse a partir de un toque del usuario (Google abre una ventana emergente).
-  async function autorizar(clientId, forzarConsentimiento) {
-    if (!clientId) throw new Error('Falta configurar el ID de cliente de Google en Ajustes.');
-    await cargarGIS();
-    return new Promise((ok, mal) => {
+  // Deja listo el acceso de Google antes de que el usuario toque "Conectar".
+  // Chrome bloquea la ventana de Google si se abre después de una espera (por ejemplo, mientras se carga el script).
+  let pendiente = null, clientePara = '';
+  function precargar(clientId) {
+    if (!clientId) return Promise.resolve();
+    return cargarGIS().then(() => {
+      if (tokenClient && clientePara === clientId) return;
+      clientePara = clientId;
       tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: clientId,
         scope: SCOPE,
         callback: r => {
-          if (r.error) return mal(new Error('Google rechazó el acceso: ' + r.error));
+          const p = pendiente; pendiente = null;
+          if (!p) return;
+          clearTimeout(p.reloj);
+          if (r.error) return p.mal(new Error(mensajeError(r.error)));
           token = r.access_token; vence = Date.now() + (Number(r.expires_in) || 3600) * 1000;
-          ok();
+          p.ok();
         },
-        error_callback: e => mal(new Error(e?.type === 'popup_closed' ? 'Se cerró la ventana de Google.' : 'No se pudo abrir la ventana de Google (revise el bloqueo de ventanas emergentes).'))
+        error_callback: e => {
+          const p = pendiente; pendiente = null;
+          if (!p) return;
+          clearTimeout(p.reloj);
+          p.mal(new Error(e?.type === 'popup_closed' ? 'Se cerró la ventana de Google sin completar el acceso.'
+            : e?.type === 'popup_failed_to_open' ? 'El navegador bloqueó la ventana de Google. Permita las ventanas emergentes para este sitio (ícono en la barra de direcciones) y vuelva a intentar.'
+            : 'No se pudo completar el acceso con Google.'));
+        }
       });
+    });
+  }
+
+  function mensajeError(codigo) {
+    if (codigo === 'access_denied') return 'Google denegó el acceso. Verifique que su cuenta esté agregada en "Usuarios de prueba" del proyecto de Google Cloud y que haya tocado "Permitir".';
+    return 'Google rechazó el acceso (' + codigo + ').';
+  }
+
+  // Debe llamarse directamente desde un toque del usuario, sin esperas previas.
+  function autorizar(clientId, forzarConsentimiento) {
+    if (!clientId) return Promise.reject(new Error('Falta configurar el ID de cliente de Google en Ajustes.'));
+    const pedir = () => new Promise((ok, mal) => {
+      if (pendiente) { clearTimeout(pendiente.reloj); pendiente.mal(new Error('Solicitud reemplazada.')); }
+      // Si la ventana no responde en 2 minutos, se cancela para que el botón vuelva a funcionar.
+      const reloj = setTimeout(() => {
+        if (pendiente && pendiente.reloj === reloj) { pendiente = null; mal(new Error('No hubo respuesta de la ventana de Google. Revise si el navegador la bloqueó y vuelva a intentar.')); }
+      }, 120000);
+      pendiente = { ok, mal, reloj };
       tokenClient.requestAccessToken({ prompt: forzarConsentimiento ? 'consent' : '' });
     });
+    // Caso normal: el acceso ya está precargado y la ventana se abre en el mismo toque.
+    if (tokenClient && clientePara === clientId) return pedir();
+    // Primera vez sin precarga: se carga ahora; si el navegador bloquea la ventana, el segundo toque funcionará.
+    return precargar(clientId).then(pedir);
   }
 
   async function api(url, opts = {}) {
@@ -114,5 +149,5 @@ const Drive = (() => {
     token = null; vence = 0;
   }
 
-  return { autorizar, sincronizar, tieneToken, desconectar };
+  return { autorizar, precargar, sincronizar, tieneToken, desconectar };
 })();
