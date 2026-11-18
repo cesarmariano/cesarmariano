@@ -28,24 +28,47 @@ const Drive = (() => {
     return gisPromise;
   }
 
-  // Debe llamarse a partir de un toque del usuario (Google abre una ventana emergente).
-  async function autorizar(clientId, forzarConsentimiento) {
-    if (!clientId) throw new Error('Falta configurar el ID de cliente de Google en Ajustes.');
-    await cargarGIS();
-    return new Promise((ok, mal) => {
+  /* Debe llamarse a partir de un toque del usuario (Google abre una ventana emergente).
+     Si la biblioteca de Google ya está cargada, la ventana se abre sin demoras: así el navegador
+     no la bloquea. Por eso se precarga al abrir la aplicación (precargar). */
+  function autorizar(clientId, forzarConsentimiento) {
+    if (!clientId) return Promise.reject(new Error('Falta configurar el ID de cliente de Google en Ajustes.'));
+    const pedir = () => new Promise((ok, mal) => {
       tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: clientId,
         scope: SCOPE,
         callback: r => {
-          if (r.error) return mal(new Error('Google rechazó el acceso: ' + r.error));
+          if (r.error) return mal(new Error(mensajeError(r.error, r.error_description)));
+          if (!google.accounts.oauth2.hasGrantedAllScopes(r, SCOPE)) {
+            return mal(new Error('No se otorgó el permiso para Google Drive. Vuelva a conectar y tilde la casilla de acceso a Drive.'));
+          }
           token = r.access_token; vence = Date.now() + (Number(r.expires_in) || 3600) * 1000;
           ok();
         },
-        error_callback: e => mal(new Error(e?.type === 'popup_closed' ? 'Se cerró la ventana de Google.' : 'No se pudo abrir la ventana de Google (revise el bloqueo de ventanas emergentes).'))
+        error_callback: e => mal(new Error(
+          e?.type === 'popup_closed' ? 'Se cerró la ventana de Google antes de terminar.' :
+          e?.type === 'popup_failed_to_open' ? 'El navegador bloqueó la ventana de Google. Permita las ventanas emergentes para cesarmariano.github.io y vuelva a intentar.' :
+          'No se pudo abrir la ventana de Google (' + (e?.type || 'error desconocido') + ').'))
       });
       tokenClient.requestAccessToken({ prompt: forzarConsentimiento ? 'consent' : '' });
     });
+    if (window.google?.accounts?.oauth2) return pedir();
+    // La biblioteca todavía no estaba cargada: se carga y se pide un segundo toque para no ser bloqueados.
+    return cargarGIS().then(() => { throw new Error('Se terminó de preparar el acceso de Google. Toque el botón nuevamente.'); });
   }
+
+  function mensajeError(codigo, detalle) {
+    const m = {
+      access_denied: 'Google negó el acceso. Verifique que su cuenta esté agregada como usuario de prueba en Google Cloud (Google Auth Platform → Público).',
+      invalid_client: 'El ID de cliente de Google no es válido.',
+      unauthorized_client: 'El ID de cliente no admite esta página.',
+      origin_mismatch: 'Esta dirección no está autorizada en Google Cloud. Agregue https://cesarmariano.github.io en Orígenes autorizados de JavaScript.',
+      redirect_uri_mismatch: 'Esta dirección no está autorizada en Google Cloud. Agregue https://cesarmariano.github.io en Orígenes autorizados de JavaScript.'
+    }[codigo];
+    return (m || 'Google rechazó el acceso') + ` [${codigo}${detalle ? ': ' + detalle : ''}]`;
+  }
+
+  const precargar = () => cargarGIS().catch(() => {});
 
   async function api(url, opts = {}) {
     const r = await fetch(url, { ...opts, headers: { Authorization: 'Bearer ' + token, ...(opts.headers || {}) } });
@@ -115,5 +138,5 @@ const Drive = (() => {
     token = null; vence = 0;
   }
 
-  return { autorizar, sincronizar, tieneToken, desconectar };
+  return { autorizar, sincronizar, tieneToken, desconectar, precargar };
 })();

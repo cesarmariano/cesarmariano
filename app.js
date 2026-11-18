@@ -362,13 +362,16 @@ async function sincronizar(interactivo) {
     const datos = await Drive.sincronizar(db, combinar, respaldo);
     db = normalizar(datos);
     escribir(STORAGE_KEY, db);
-    Object.assign(local, { driveConectado: true, ultimaSync: ahora(), pendiente: false });
+    Object.assign(local, { driveConectado: true, ultimaSync: ahora(), pendiente: false, ultimoError: '' });
     if (respaldo) local.ultimoRespaldo = respaldo;
     guardarLocal();
     if (interactivo) toast('Datos sincronizados con Google Drive.');
     refrescarVista();
   } catch (e) {
-    if (interactivo) toast(e.message || 'No se pudo sincronizar.');
+    if (interactivo) {
+      local.ultimoError = `${new Date().toLocaleString('es-AR')}: ${e.message || 'No se pudo sincronizar.'}`; guardarLocal();
+      toast(e.message || 'No se pudo sincronizar.');
+    }
   } finally {
     sincronizando = false; pintarNube();
   }
@@ -405,6 +408,7 @@ function conectarInstalar() {
 /* ---------- Ajustes ---------- */
 function renderAjustes() {
   setHeader('Ajustes', () => irInicio());
+  if (navigator.onLine) Drive.precargar();
   const cidFijo = !!(window.ALVEON_CONFIG || {}).googleClientId;
   view.innerHTML = `
     <form class="card" id="fcfg">
@@ -439,6 +443,8 @@ function renderAjustes() {
       <p class="hint">${local.driveConectado
         ? `Conectado. Última sincronización: ${local.ultimaSync ? new Date(local.ultimaSync).toLocaleString('es-AR') : '—'}.`
         : 'No conectado.'}</p>
+      ${local.ultimoError ? `<p class="error-box">Último error: ${esc(local.ultimoError)}</p>` : ''}
+      <p class="hint small">Dirección de esta página: ${esc(location.origin)}${clientId() ? ` · ID de cliente terminado en …${esc(clientId().split('.')[0].slice(-6))}` : ''}</p>
       <div class="actions">
         <button class="btn primary" id="c-sync">${local.driveConectado ? 'Sincronizar ahora' : 'Conectar Google Drive'}</button>
         ${local.driveConectado ? '<button class="btn danger" id="c-desc">Desconectar</button>' : ''}

@@ -242,3 +242,4 @@ textarea.field.tall { min-height: 170px; }
 a { color: var(--brand); }
 @media (prefers-color-scheme: dark) { a { color: #7fa8ff; } }
 .doc-item .pills .pill { flex: none; } /* la clase "info" de las etiquetas no debe heredar el ancho de .doc-item .info */
+.error-box { background: rgba(179,38,30,.1); color: var(--danger); border-radius: 8px; padding: 10px 12px; font-size: .9rem; overflow-wrap: anywhere; }
