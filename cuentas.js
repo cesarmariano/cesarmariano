@@ -67,6 +67,7 @@ function renderCuentas() {
       <div class="summary"><span>${lista.length} de ${todas.length} cuenta(s)</span><span>${vencidos} seguimiento(s) para hoy o vencidos</span></div>
       <div id="lista">${lista.map(itemCuenta).join('') || '<div class="empty">Sin resultados.</div>'}</div>
     ` : `<div class="empty">Todavía no hay cuentas cargadas.<br>Toque <b>+ Nueva cuenta</b> para cargar una obra social, hospital, sanatorio, clínica u otro prestador.</div>`}
+    ${piePrivacidad()}
   `;
   $('#btn-nueva').onclick = () => renderFormCuenta(null);
   $('#btn-act-rapida').onclick = renderElegirCuentaActividad;

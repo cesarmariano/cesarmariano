@@ -25,7 +25,7 @@ const PROVINCIAS = ['Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Có
   'Tierra del Fuego', 'Tucumán'];
 const MONEDAS = ['ARS', 'USD'];
 const REMITENTE_BASE = 'cotizaciones.alveon@gmail.com';
-const VERSION = '1.7 (18/11/2026)';
+const VERSION = '1.8 (18/11/2026)';
 
 /* Tipos de actividad. "etapa": etapa comercial a la que avanza la cuenta al registrarla.
    "campos": datos propios del tipo (además de fecha, contactos, detalle y seguimiento). */
@@ -401,6 +401,8 @@ const instalada = () => matchMedia('(display-mode: standalone)').matches || navi
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); eventoInstalar = e; if ($('#btn-nueva')) irInicio(); });
 window.addEventListener('appinstalled', () => { eventoInstalar = null; toast('Aplicación instalada.'); });
 
+const piePrivacidad = () => `<p class="pie-legal">Alveon B2B · aplicación interna de gestión comercial de Alveon · <a href="privacidad.html">Privacidad</a></p>`;
+
 function bannerInstalar() {
   if (instalada() || !eventoInstalar) return '';
   return `<div class="card banner"><span>Instale la aplicación en este dispositivo para abrirla con un toque.</span>
@@ -414,7 +416,8 @@ function conectarInstalar() {
 /* ---------- Ajustes ---------- */
 function renderAjustes() {
   setHeader('Ajustes', () => irInicio());
-  if (navigator.onLine) Drive.precargar();
+  // El acceso de Google se carga sólo aquí, y sólo si se usa la conexión con ventana emergente.
+  if (navigator.onLine && local.modoAcceso !== 'redireccion') Drive.precargar();
   const cidFijo = !!(window.ALVEON_CONFIG || {}).googleClientId;
   view.innerHTML = `
     <form class="card" id="fcfg">
@@ -424,7 +427,7 @@ function renderAjustes() {
       <h2 class="mt">Correo</h2>
       <div class="form-row"><label for="c-rem">Cuenta remitente</label>
         <input class="field" id="c-rem" type="email" inputmode="email" autocapitalize="off" value="${esc(remitente())}">
-        <p class="hint small">Los correos se abren desde esta cuenta. Debe tener la sesión iniciada en el navegador o en la aplicación Gmail del dispositivo. La aplicación no guarda ni usa contraseñas.</p></div>
+        <p class="hint small">Los correos se abren en Gmail con esta cuenta, que debe estar abierta en el navegador o en la aplicación Gmail del dispositivo.</p></div>
       <div class="form-row"><label>Forma de abrir los correos en este dispositivo</label>
         <div class="choice" data-choice="c-modo">
           <button type="button" class="${local.modoCorreo === 'gmail' ? 'on' : ''}" data-val="gmail">Gmail en el navegador</button>
@@ -481,7 +484,7 @@ function renderAjustes() {
       </div>
       <input type="file" id="imp" accept="application/json,.json" hidden>
     </div>
-    <p class="hint small" style="text-align:center">Alveon B2B · versión ${VERSION}</p>`;
+    <p class="hint small" style="text-align:center">Alveon B2B · versión ${VERSION} · <a href="privacidad.html">Privacidad</a></p>`;
   conectarCampos(view);
 
   $('#fcfg').onsubmit = e => {

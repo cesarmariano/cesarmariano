@@ -1,7 +1,7 @@
 // Permite usar la aplicación sin conexión una vez abierta por primera vez.
-const CACHE = 'alveon-b2b-v8';
+const CACHE = 'alveon-b2b-v9';
 const FILES = [
-  './', './index.html', './instalar.html', './styles.css', './config.js', './drive.js', './app.js', './cuentas.js',
+  './', './index.html', './instalar.html', './privacidad.html', './styles.css', './config.js', './drive.js', './app.js', './cuentas.js',
   './agenda.js', './difusion.js', './informes.js', './main.js',
   './manifest.webmanifest', './logo.jpg', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
   './lib/jspdf.umd.min.js', './lib/jspdf.plugin.autotable.min.js', './lib/qrcode.js'

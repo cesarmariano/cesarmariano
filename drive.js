@@ -70,7 +70,7 @@ const Drive = (() => {
 
   /* Debe llamarse a partir de un toque del usuario (Google abre una ventana emergente).
      Si la biblioteca de Google ya está cargada, la ventana se abre sin demoras: así el navegador
-     no la bloquea. Por eso se precarga al abrir la aplicación (precargar). */
+     no la bloquea. Por eso se precarga al entrar en Ajustes (precargar), nunca en la pantalla principal. */
   function autorizar(clientId, forzarConsentimiento) {
     if (!clientId) return Promise.reject(new Error('Falta configurar el ID de cliente de Google en Ajustes.'));
     const pedir = () => new Promise((ok, mal) => {

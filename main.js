@@ -23,8 +23,6 @@ if (retornoGoogle) {
   }
 } else irInicio();
 pintarNube();
-// La biblioteca de Google se carga de antemano para que la ventana de acceso no sea bloqueada.
-if (clientId() && navigator.onLine) Drive.precargar();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }

@@ -36,7 +36,7 @@ Seguimientos pendientes, licitaciones en curso con fecha de apertura, cotizacion
 Representante, cuenta remitente, forma de abrir el correo en cada dispositivo (Gmail en el navegador o aplicación de correo), firma, catálogo de productos y servicios, Google Drive, instalación y copia de seguridad manual.
 
 ## Correo desde cotizaciones.alveon@gmail.com
-La aplicación **no guarda ni usa contraseñas**. Abre la ventana de redacción de Gmail para esa cuenta, por lo que en cada dispositivo debe estar iniciada la sesión de cotizaciones.alveon@gmail.com:
+La aplicación abre la ventana de redacción de Gmail para esa cuenta, por lo que en cada dispositivo debe estar abierta la cuenta cotizaciones.alveon@gmail.com:
 - **Mac y Linux**: en el navegador (Gmail en el navegador). Si hay varias cuentas abiertas, Gmail usa la indicada en Ajustes.
 - **Celular**: en la aplicación Gmail (opción "Aplicación de correo"); verificar el remitente antes de enviar.
 
@@ -55,6 +55,9 @@ Usa el mismo ID de cliente de Google que la aplicación de visitas médicas (sir
 
 ### 3. Íconos
 `python3 tools/generar_iconos.py [logo] [simbolo]` genera los íconos con la franja "B2B" que los distingue de la aplicación de visitas médicas.
+
+## Privacidad
+La página `privacidad.html` explica qué datos guarda la aplicación, dónde y para qué usa el acceso a Google.
 
 ## Datos
 Cada dispositivo guarda una copia local. Al sincronizar se combinan las copias: por cuenta, contacto y actividad prevalece la modificación más reciente.
