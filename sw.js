@@ -1,5 +1,5 @@
 // Permite usar la aplicación sin conexión una vez abierta por primera vez.
-const CACHE = 'alveon-b2b-v7';
+const CACHE = 'alveon-b2b-v8';
 const FILES = [
   './', './index.html', './instalar.html', './styles.css', './config.js', './drive.js', './app.js', './cuentas.js',
   './agenda.js', './difusion.js', './informes.js', './main.js',
