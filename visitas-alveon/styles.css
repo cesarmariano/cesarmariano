@@ -124,11 +124,17 @@ h2 { font-size: 1.05rem; margin: 0 0 12px; }
 
 #toast {
   position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom));
-  transform: translateX(-50%) translateY(120px);
+  transform: translateX(-50%) translateY(16px);
   background: #1c2830; color: #fff; padding: 12px 18px; border-radius: 10px;
-  transition: transform .25s; max-width: calc(100% - 32px); z-index: 20;
+  max-width: calc(100% - 32px); z-index: 20; text-align: center;
+  /* Oculto por completo cuando no se muestra (no depende de la altura de la barra inferior). */
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity .25s, transform .25s, visibility 0s linear .25s;
 }
-#toast.show { transform: translateX(-50%) translateY(0); }
+#toast.show {
+  opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0);
+  transition: opacity .25s, transform .25s, visibility 0s;
+}
 
 /* Agregados v2 */
 .topbar-logo { width: 30px; height: 30px; border-radius: 7px; background: #fff; object-fit: contain; }

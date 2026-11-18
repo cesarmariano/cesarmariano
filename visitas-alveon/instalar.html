@@ -88,7 +88,7 @@
       document.getElementById('qr').innerHTML = qr.createImgTag(6, 0, 'Código QR del enlace');
     } catch (_) { document.getElementById('qr').hidden = true; }
 
-    const toast = m => { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); };
+    const toast = m => { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); };
     document.getElementById('copiar').onclick = async () => {
       try { await navigator.clipboard.writeText(url); toast('Enlace copiado.'); }
       catch (_) { toast('No se pudo copiar. Mantenga presionado el enlace para copiarlo.'); }

@@ -136,7 +136,7 @@ const frecuencia = () => Number(db.config.frecuenciaDias) || 30;
 function toast(msg) {
   const t = $('#toast');
   t.textContent = msg; t.classList.add('show');
-  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 3000);
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2000);
 }
 let seccion = 'medicos';
 function irInicio() { return seccion === 'pacientes' ? renderPacientes() : renderHome(); }
