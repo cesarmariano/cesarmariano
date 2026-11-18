@@ -44,12 +44,11 @@ Gmail admite hasta 500 destinatarios por día en cuentas personales.
 
 ## Puesta en marcha
 
-### 1. Publicación
-GitHub Pages publica una sola rama por repositorio, por eso esta aplicación va en un repositorio propio:
-1. Crear en GitHub un repositorio vacío, por ejemplo `alveon-b2b`.
-2. Subir el contenido de la rama `claude/b2b-visitas-bizdev-1kh0l7` (la aplicación está en la raíz).
-3. Repositorio → **Settings** → **Pages** → Source: **Deploy from a branch** → la rama elegida, carpeta `/ (root)` → **Save**.
-4. La dirección será `https://cesarmariano.github.io/alveon-b2b/`.
+### 1. Publicación (una sola vez)
+Repositorio `cesarmariano/AlveonB2B` → **Settings** → **Pages** → *Build and deployment* → Source: **Deploy from a branch** → Branch: `main`, carpeta `/ (root)` → **Save**.
+
+- Aplicación: https://cesarmariano.github.io/AlveonB2B/
+- Instalación en otros dispositivos (enlace, QR e instrucciones): https://cesarmariano.github.io/AlveonB2B/instalar.html
 
 ### 2. Google Drive
 Usa el mismo ID de cliente de Google que la aplicación de visitas médicas (sirve para cualquier página en `https://cesarmariano.github.io`). Los datos se guardan en la carpeta **Alveon B2B**, con un respaldo diario. En cada dispositivo: **Ajustes → Conectar Google Drive** con la misma cuenta de Google.
