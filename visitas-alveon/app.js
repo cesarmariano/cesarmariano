@@ -875,6 +875,35 @@ async function sincronizar(interactivo) {
 
 let refrescarVista = () => irInicio();
 
+/* ---------- Conexión alternativa (sin ventana emergente) ---------- */
+const direccionRetorno = () => new URL('index.html', location.href.split('#')[0].split('?')[0]).href;
+function conectarPorRedireccion() {
+  if (!clientId()) { toast('Primero ingrese el ID de cliente de Google.'); return; }
+  const estado = uid();
+  try { sessionStorage.setItem('alveon-oauth-estado', estado); } catch (_) { /* sin almacenamiento */ }
+  location.href = Drive.urlRedireccion(clientId(), direccionRetorno(), estado);
+}
+// Al volver de Google: toma el permiso de la dirección, la limpia y sincroniza.
+function procesarRetornoGoogle() {
+  let estado = '';
+  try { estado = sessionStorage.getItem('alveon-oauth-estado') || ''; } catch (_) { /* sin almacenamiento */ }
+  const r = Drive.leerRedireccion(location.hash, estado);
+  if (!r) return false;
+  try { sessionStorage.removeItem('alveon-oauth-estado'); } catch (_) { /* sin almacenamiento */ }
+  history.replaceState(null, '', location.pathname + location.search);
+  renderAjustes();
+  if (r.error) { estadoSync(r.error, true); toast(r.error, 8000); return true; }
+  refrescarVista = renderAjustes;
+  sincronizar(true).then(() => { refrescarVista = irInicio; renderAjustes(); });
+  return true;
+}
+// Autorización que llega tarde por la ventana emergente (después del aviso falso de "ventana cerrada").
+window.addEventListener('drive-token', () => {
+  refrescarVista = $('#sync-estado') ? renderAjustes : irInicio;
+  sincronizar(true).then(() => { refrescarVista = irInicio; });
+});
+window.addEventListener('drive-error', e => { estadoSync(e.detail, true); toast(e.detail, 8000); });
+
 /* Muestra en Ajustes el paso actual de la sincronización o el último error (queda visible hasta resolverlo). */
 let ultimoEstadoSync = { texto: '', error: false };
 function estadoSync(texto, error = false) {
@@ -946,8 +975,10 @@ function renderAjustes() {
       <p id="sync-estado" class="sync-estado${ultimoEstadoSync.error ? ' error' : ''}${ultimoEstadoSync.texto ? '' : ' vacio'}" role="status">${esc(ultimoEstadoSync.texto)}</p>
       <div class="actions">
         <button class="btn primary" id="c-sync">${local.driveConectado ? 'Sincronizar ahora' : 'Conectar Google Drive'}</button>
-        ${local.driveConectado ? '<button class="btn danger" id="c-desc">Desconectar</button>' : ''}
+        ${local.driveConectado ? '<button class="btn danger" id="c-desc">Desconectar</button>' : '<button class="btn" id="c-redir">Conectar con otro método</button>'}
       </div>
+      ${local.driveConectado ? '' : `<p class="hint">"Conectar con otro método" no usa ventana emergente: la página va a Google y vuelve. Requiere agregar
+        <b>${esc(direccionRetorno())}</b> en "URI de redireccionamiento autorizados" del ID de cliente en Google Cloud.</p>`}
     </div>
 
     <div class="card">
@@ -986,6 +1017,7 @@ function renderAjustes() {
     refrescarVista = irInicio;
     renderAjustes();
   };
+  if ($('#c-redir')) $('#c-redir').onclick = conectarPorRedireccion;
   if ($('#c-desc')) $('#c-desc').onclick = () => {
     if (!confirm('¿Desconectar Google Drive en este dispositivo? Los datos locales y los de Drive se conservan.')) return;
     Drive.desconectar(); Object.assign(local, { driveConectado: false, pendiente: false }); guardarLocal(); pintarNube(); renderAjustes();

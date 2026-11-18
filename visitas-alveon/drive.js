@@ -40,25 +40,55 @@ const Drive = (() => {
         scope: SCOPE,
         callback: r => {
           const p = pendiente; pendiente = null;
-          if (!p) return;
-          clearTimeout(p.reloj);
-          if (r.error) return p.mal(new Error(mensajeError(r.error)));
-          if (!google.accounts.oauth2.hasGrantedAllScopes(r, SCOPE)) {
-            return p.mal(new Error('Google no otorgó el permiso para Drive. Vuelva a tocar el botón y, en la ventana de Google, marque la casilla "Ver, editar, crear y borrar solo los archivos de Google Drive específicos que use con esta app" antes de tocar Continuar.'));
-          }
+          if (p) clearTimeout(p.reloj);
+          const fallar = msg => (p ? p.mal(new Error(msg)) : window.dispatchEvent(new CustomEvent('drive-error', { detail: msg })));
+          if (r.error) return fallar(mensajeError(r.error));
+          if (!google.accounts.oauth2.hasGrantedAllScopes(r, SCOPE)) return fallar(MSG_CASILLA);
           token = r.access_token; vence = Date.now() + (Number(r.expires_in) || 3600) * 1000;
-          p.ok();
+          // La autorización puede llegar después de que Google informó (por error) que la ventana se cerró.
+          if (p) p.ok(); else window.dispatchEvent(new Event('drive-token'));
         },
         error_callback: e => {
-          const p = pendiente; pendiente = null;
+          const p = pendiente;
           if (!p) return;
-          clearTimeout(p.reloj);
-          p.mal(new Error(e?.type === 'popup_closed' ? 'Se cerró la ventana de Google sin completar el acceso.'
-            : e?.type === 'popup_failed_to_open' ? 'El navegador bloqueó la ventana de Google. Permita las ventanas emergentes para este sitio (ícono en la barra de direcciones) y vuelva a intentar.'
+          if (e?.type === 'popup_closed') {
+            // Google a veces informa "ventana cerrada" mientras la autorización todavía está en curso
+            // (por ejemplo, en aplicaciones instaladas). Se espera unos segundos más antes de darla por fallida.
+            clearTimeout(p.reloj);
+            p.reloj = setTimeout(() => {
+              if (pendiente !== p) return;
+              pendiente = null;
+              p.mal(new Error('No se recibió la autorización de Google. Si completó los pasos en la ventana de Google, use el botón "Conectar con otro método".'));
+            }, 20000);
+            return;
+          }
+          pendiente = null; clearTimeout(p.reloj);
+          p.mal(new Error(e?.type === 'popup_failed_to_open'
+            ? 'El navegador bloqueó la ventana de Google. Permita las ventanas emergentes para este sitio (ícono en la barra de direcciones) o use "Conectar con otro método".'
             : 'No se pudo completar el acceso con Google.'));
         }
       });
     });
+  }
+
+  const MSG_CASILLA = 'Google no otorgó el permiso para Drive. Vuelva a conectar y, en la ventana de Google, marque la casilla "Ver, editar, crear y borrar solo los archivos de Google Drive específicos que use con esta app" antes de tocar Continuar.';
+
+  /* Método alternativo sin ventana emergente: la página va a Google y Google la devuelve con el permiso.
+     Requiere registrar la dirección de retorno en "URI de redireccionamiento autorizados" del ID de cliente. */
+  function urlRedireccion(clientId, retorno, estado) {
+    const q = new URLSearchParams({ client_id: clientId, redirect_uri: retorno, response_type: 'token', scope: SCOPE,
+      include_granted_scopes: 'true', state: estado, prompt: 'consent' });
+    return 'https://accounts.google.com/o/oauth2/v2/auth?' + q;
+  }
+  // Procesa la respuesta de Google en la dirección (#access_token=…). Devuelve null si no hay respuesta.
+  function leerRedireccion(hash, estadoEsperado) {
+    const q = new URLSearchParams(String(hash || '').replace(/^#/, ''));
+    if (!q.get('access_token') && !q.get('error')) return null;
+    if (!estadoEsperado || q.get('state') !== estadoEsperado) return { error: 'La respuesta de Google no corresponde a esta solicitud. Vuelva a intentar.' };
+    if (q.get('error')) return { error: mensajeError(q.get('error')) };
+    if (!String(q.get('scope') || '').split(' ').includes(SCOPE)) return { error: MSG_CASILLA };
+    token = q.get('access_token'); vence = Date.now() + (Number(q.get('expires_in')) || 3600) * 1000;
+    return { ok: true };
   }
 
   function mensajeError(codigo) {
@@ -174,5 +204,5 @@ const Drive = (() => {
     token = null; vence = 0;
   }
 
-  return { autorizar, precargar, sincronizar, tieneToken, desconectar };
+  return { autorizar, precargar, sincronizar, tieneToken, desconectar, urlRedireccion, leerRedireccion };
 })();

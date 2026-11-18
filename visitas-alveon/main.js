@@ -11,7 +11,7 @@ document.querySelectorAll('#bottom-nav [data-sec]').forEach(b => (b.onclick = ()
 window.addEventListener('online', programarSync);
 escribir(STORAGE_KEY, db); // guarda la migración de datos, si hubo
 try { seccion = localStorage.getItem('alveon-seccion') === 'pacientes' ? 'pacientes' : 'medicos'; } catch (_) { /* sin almacenamiento */ }
-irInicio();
+if (!procesarRetornoGoogle()) irInicio();
 pintarNube();
 // Precarga el acceso de Google para que la ventana se abra en el mismo toque (requisito de Chrome).
 Drive.precargar(clientId()).catch(() => { /* sin conexión: se reintenta al tocar Conectar */ });
