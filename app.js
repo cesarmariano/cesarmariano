@@ -25,7 +25,7 @@ const PROVINCIAS = ['Buenos Aires', 'CABA', 'Catamarca', 'Chaco', 'Chubut', 'Có
   'Tierra del Fuego', 'Tucumán'];
 const MONEDAS = ['ARS', 'USD'];
 const REMITENTE_BASE = 'cotizaciones.alveon@gmail.com';
-const VERSION = '1.4 (18/11/2026)';
+const VERSION = '1.5 (18/11/2026)';
 
 /* Tipos de actividad. "etapa": etapa comercial a la que avanza la cuenta al registrarla.
    "campos": datos propios del tipo (además de fecha, contactos, detalle y seguimiento). */
