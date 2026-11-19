@@ -1,0 +1,21 @@
+/* Versión de la aplicación: único lugar donde se define.
+   Formato MAYOR.MENOR.CORRECCIÓN
+   - MAYOR: cambio grande (por ejemplo, una sección nueva).
+   - MENOR: función nueva.
+   - CORRECCIÓN: corrección de errores.
+   Al publicar cambios: aumentar el número y agregar la entrada al principio de NOVEDADES.
+   También lo usa sw.js para que cada dispositivo descargue la versión nueva. */
+self.ALVEON_VERSION = '2.3.0';
+self.ALVEON_NOVEDADES = [
+  { v: '2.3.0', fecha: '2026-11-19', cambios: ['Si el mismo dato se modificó en dos dispositivos, la aplicación pregunta cuál conservar.', 'Versión visible en Ajustes e historial de versiones.'] },
+  { v: '2.2.0', fecha: '2026-11-18', cambios: ['Sincronización campo por campo: se conserva el cambio más reciente de cada dato.'] },
+  { v: '2.1.4', fecha: '2026-11-18', cambios: ['Google Drive: se acepta la autorización aunque Google informe que la ventana se cerró.', 'Nuevo botón "Conectar con otro método" (sin ventana emergente).'] },
+  { v: '2.1.3', fecha: '2026-11-18', cambios: ['Google Drive: verificación del permiso, errores explicados y estado de la conexión en Ajustes.'] },
+  { v: '2.1.2', fecha: '2026-11-18', cambios: ['Google Drive: corrección de la conexión en Chrome de escritorio.'] },
+  { v: '2.1.1', fecha: '2026-11-18', cambios: ['Los avisos duran 2 segundos y ya no quedan sobre la barra inferior.'] },
+  { v: '2.1.0', fecha: '2026-11-17', cambios: ['Días, horarios y lugares de atención en el perfil del médico.'] },
+  { v: '2.0.0', fecha: '2026-11-17', cambios: ['Nueva sección Pacientes: concentradores y CPAP, alquiler y venta, adherencia, mantenimiento, actividades y PDF.'] },
+  { v: '1.2.0', fecha: '2026-11-17', cambios: ['Logo y colores de Alveon.', 'ID de cliente de Google incorporado.'] },
+  { v: '1.1.0', fecha: '2026-11-17', cambios: ['Próxima visita, ciudad y provincia, filtros del PDF, Google Drive e instalación.'] },
+  { v: '1.0.0', fecha: '2026-11-17', cambios: ['Primera versión: registro de visitas a médicos y PDF.'] }
+];

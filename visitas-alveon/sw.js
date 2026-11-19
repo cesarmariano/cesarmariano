@@ -1,7 +1,8 @@
 // Permite usar la aplicación sin conexión una vez abierta por primera vez.
-const CACHE = 'visitas-alveon-v12';
+importScripts('version.js');
+const CACHE = 'alveon-' + self.ALVEON_VERSION;
 const FILES = [
-  './', './index.html', './instalar.html', './styles.css', './app.js', './config.js', './drive.js', './pacientes.js', './main.js',
+  './', './index.html', './instalar.html', './styles.css', './app.js', './config.js', './version.js', './drive.js', './pacientes.js', './main.js',
   './manifest.webmanifest', './logo.jpg', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
   './lib/jspdf.umd.min.js', './lib/jspdf.plugin.autotable.min.js', './lib/qrcode.js'
 ];

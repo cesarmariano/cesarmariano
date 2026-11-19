@@ -1150,6 +1150,18 @@ function renderAjustes() {
     </div>
 
     <div class="card">
+      <h2>Acerca de</h2>
+      <p class="value" style="margin-top:0">Alveon – Médicos y pacientes · <b>versión ${esc(self.ALVEON_VERSION)}</b>
+        <span class="hint">(${fmtFecha((self.ALVEON_NOVEDADES[0] || {}).fecha)})</span></p>
+      <p class="hint">Para comprobar que todos sus dispositivos tienen la misma versión, compare este número en cada uno.</p>
+      <details class="novedades">
+        <summary>Historial de versiones</summary>
+        ${self.ALVEON_NOVEDADES.map(n => `<div class="visit"><div class="meta"><span>Versión ${esc(n.v)}</span><span class="hint">${fmtFecha(n.fecha)}</span></div>
+          <ul>${n.cambios.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>`).join('')}
+      </details>
+    </div>
+
+    <div class="card">
       <h2>Copia de seguridad manual</h2>
       <p class="hint">Archivo JSON con todos los datos (médicos y pacientes), para guardar o pasar a otro equipo.</p>
       <div class="actions">

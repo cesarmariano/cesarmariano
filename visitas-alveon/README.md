@@ -49,3 +49,10 @@ Para reemplazar el logo provisorio: `python3 tools/generar_iconos.py ruta/al/Log
 
 ## Datos
 Cada dispositivo guarda una copia local. Al sincronizar se combinan las copias: por cada médico prevalece la modificación más reciente y las visitas de ambos dispositivos se conservan.
+
+## Versiones
+La versión vigente y el historial se definen en un único archivo: `version.js` (formato MAYOR.MENOR.CORRECCIÓN).
+- **MAYOR**: cambio grande (por ejemplo, una sección nueva). **MENOR**: función nueva. **CORRECCIÓN**: corrección de errores.
+- Al publicar cambios: aumentar el número en `version.js` y agregar la entrada al principio de `ALVEON_NOVEDADES`.
+- El número se ve en **Ajustes → Acerca de** y en la página de instalación; también define la caché del modo sin conexión,
+  de modo que cada dispositivo descarga los archivos nuevos al cambiar la versión.

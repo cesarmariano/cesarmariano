@@ -73,16 +73,19 @@
     </div>
     <div class="card">
       <h3>Datos en todos los dispositivos</h3>
+      <p class="hint" style="margin:0 0 8px">Versión actual: <b id="ver"></b>. Puede comprobar la versión de cada dispositivo en Ajustes.</p>
       <p class="hint" style="margin:0">Cada dispositivo guarda sus datos por separado. Para ver la misma información en todos, en cada uno vaya a <b>Ajustes → Conectar Google Drive</b> con la misma cuenta de Google.</p>
     </div>
   </main>
   <div id="toast" role="status" aria-live="polite"></div>
 
+  <script src="version.js"></script>
   <script src="lib/qrcode.js"></script>
   <script>
     'use strict';
     const url = new URL('index.html', location.href).href;
     document.getElementById('url').textContent = url;
+    document.getElementById('ver').textContent = self.ALVEON_VERSION || '';
     try {
       const qr = qrcode(0, 'M'); qr.addData(url); qr.make();
       document.getElementById('qr').innerHTML = qr.createImgTag(6, 0, 'Código QR del enlace');

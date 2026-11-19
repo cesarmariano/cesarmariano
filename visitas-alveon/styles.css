@@ -212,3 +212,5 @@ body.con-nav #toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
 .opcion small { color: var(--muted); font-size: .8rem; }
 .opcion.on { border-color: var(--brand); background: rgba(10,71,184,.08); }
 .opcion.on small::after { content: '  ✓ se conservará'; color: var(--brand); font-weight: 700; }
+.novedades summary { cursor: pointer; font-weight: 600; color: var(--brand); min-height: 40px; display: flex; align-items: center; }
+.novedades ul { margin: 6px 0 0; padding-left: 20px; color: var(--muted); font-size: .92rem; }
