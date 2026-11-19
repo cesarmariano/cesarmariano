@@ -239,7 +239,7 @@ function estadoVisita(m) {
     return { cls: '', txt: `Próxima: ${fmtFecha(m.proximaVisita)}`, orden: d };
   }
   const uv = ultimaVisita(m);
-  if (!uv) return { cls: 'late', txt: 'Sin visitas', orden: -9999 };
+  if (!uv) return { cls: 'info', txt: 'Nuevo · por visitar', orden: -9999 };
   const desde = diasEntre(uv, h);
   const restante = frecuencia() - desde;
   return { cls: restante <= 0 ? 'late' : restante <= 3 ? 'warn' : '', txt: `Última visita hace ${desde} d`, orden: restante };
@@ -261,7 +261,7 @@ function renderHome() {
       return estadoVisita(a).orden - estadoVisita(b).orden;
     });
   const totalPac = todos.reduce((s, m) => s + pacientesTotal(m), 0);
-  const pendientes = todos.filter(m => estadoVisita(m).cls === 'late').length;
+  const pendientes = todos.filter(m => estadoVisita(m).cls === 'late' || !ultimaVisita(m)).length;
 
   view.innerHTML = `
     ${bannerInstalar()}
@@ -325,10 +325,14 @@ function pasosNuevoMedico() {
     { key: 'direccion', q: '¿Cuál es la dirección?', hint: 'Calle y número del consultorio.', type: 'text' },
     pasoHorario(false),
     { key: 'celular', q: 'Número de celular para WhatsApp', hint: 'Se solicita una única vez. Incluya código de país y de área, por ejemplo: +54 9 11 1234 5678.', type: 'tel', validate: v => !v || soloDigitos(v).length >= 8 || 'El número parece incompleto.' },
-    { key: 'fecha', q: '¿Cuál fue la fecha de la última visita?', type: 'date', required: true, def: hoy(), max: hoy(), validate: validarPasado },
-    { key: 'pacientes', q: '¿Cuántos pacientes refirió a su servicio hasta ahora?', hint: 'Total acumulado.', type: 'number', def: 0 },
+    { q: '¿Cuál fue la fecha de la última visita?', campos: [
+      { key: 'fecha', label: 'Fecha de la última visita', type: 'date', required: true, def: hoy(), max: hoy(), validate: validarPasado, si: v => !v.porVisitar },
+      { key: 'porVisitar', label: 'Nuevo o por visitar (todavía no lo visité)', type: 'check' }
+    ] },
+    { key: 'pacientes', q: '¿Cuántos pacientes refirió a su servicio hasta ahora?', hint: 'Total acumulado.', type: 'number', def: 0, si: v => !v.porVisitar },
     pasoProxima(),
-    { key: 'notas', q: 'Notas de la visita', hint: 'Temas conversados, material entregado, próximos pasos.', type: 'textarea' }
+    { key: 'notas', q: 'Notas de la visita', hint: 'Temas conversados, material entregado, próximos pasos.', type: 'textarea', si: v => !v.porVisitar },
+    { key: 'notas', q: 'Notas', hint: 'Por ejemplo: quién lo recomendó, temas para la primera visita.', type: 'textarea', si: v => !!v.porVisitar }
   ];
 }
 
@@ -399,6 +403,7 @@ function startWizard(pasos, datos, onFinish, titulo, onCancel, opts = {}) {
     if (c.type === 'number') return `<input class="field" id="${id}" type="number" inputmode="decimal" min="0" step="any" value="${val}">`;
     if (c.type === 'date') return `<input class="field" id="${id}" type="date" ${c.max ? `max="${c.max}"` : ''} value="${val}">`;
     if (c.type === 'time') return `<input class="field" id="${id}" type="time" value="${val}">`;
+    if (c.type === 'check') return `<label class="check"><input type="checkbox" id="${id}" ${v ? 'checked' : ''}> ${esc(c.label)}</label>`;
     if (c.type === 'multi') {
       const elegidos = String(v || '').split(',');
       return `<div class="choice multi" data-multi="${c.key}">${opcionesDe(c).map(([o, l]) =>
@@ -436,7 +441,7 @@ function startWizard(pasos, datos, onFinish, titulo, onCancel, opts = {}) {
         ${p.hint ? `<p class="hint">${esc(p.hint)}</p>` : ''}
         ${campos.map(c => `
           <div class="form-row">
-            ${unico ? '' : `<label for="inp-${c.key}">${esc(c.label)}${c.required ? '' : ' <span class="hint">(opcional)</span>'}</label>
+            ${unico || c.type === 'check' ? '' : `<label for="inp-${c.key}">${esc(c.label)}${c.required ? '' : ' <span class="hint">(opcional)</span>'}</label>
             ${c.hint ? `<p class="hint" style="margin:0 0 6px">${esc(c.hint)}</p>` : ''}`}
             ${control(c, valores[c.key], unico)}
             ${extras(c)}
@@ -458,6 +463,8 @@ function startWizard(pasos, datos, onFinish, titulo, onCancel, opts = {}) {
       $('#inp-' + b.dataset.for).value = b.dataset.dias ? sumarDias(valores.fecha || hoy(), Number(b.dataset.dias)) : '';
     }));
     // Una opción elegida puede mostrar u ocultar otros campos: se vuelve a dibujar el paso.
+    // Una casilla puede mostrar u ocultar otros campos del paso (por ejemplo, "Nuevo o por visitar").
+    view.querySelectorAll('.check input[type=checkbox]').forEach(el => (el.onchange = () => { guardar(); paso(); }));
     view.querySelectorAll('.choice.multi button').forEach(b => (b.onclick = () => {
       b.classList.toggle('on'); b.setAttribute('aria-pressed', b.classList.contains('on'));
       const caja = b.closest('.choice');
@@ -505,14 +512,17 @@ function startWizard(pasos, datos, onFinish, titulo, onCancel, opts = {}) {
     camposDe(pasos[i]).filter(aplica).forEach(c => {
       const el = $('#inp-' + c.key);
       if (!el) return;
+      if (c.type === 'check') { valores[c.key] = el.checked ? 'si' : ''; return; }
       const raw = el.value;
       valores[c.key] = c.type === 'number' ? (raw === '' ? '' : Number(raw)) : raw.trim();
     });
   }
 
   function mostrar(c, v) {
+    if (c.type === 'check') return v ? 'Sí' : 'No';
     if (v === '' || v == null) return '—';
     if (c.type === 'date') return fmtFecha(v);
+    if (c.type === 'check') return v ? 'Sí' : 'No';
     if (c.type === 'multi') return esc(listaDias(String(v).split(',').filter(Boolean).sort((a, b) => DIAS.indexOf(a) - DIAS.indexOf(b))));
     if (c.type === 'select' || c.type === 'choice') { const o = opcionesDe(c).find(([x]) => x === v); return esc(o ? o[1] : v); }
     return esc(v);
@@ -559,7 +569,9 @@ function guardarNuevoMedico(v) {
     provincia: v.provincia, ciudad: v.ciudad, direccion: v.direccion || '',
     celular: v.celular || '', proximaVisita: v.proximaVisita || '',
     creado: ahora(), actualizado: ahora(),
-    visitas: [{ id: uid(), fecha: v.fecha, pacientes: v.pacientes, notas: v.notas || '' }],
+    // "Nuevo o por visitar": se guarda sin visitas; las notas quedan como notas del médico.
+    visitas: v.porVisitar ? [] : [{ id: uid(), fecha: v.fecha, pacientes: v.pacientes, notas: v.notas || '' }],
+    notas: v.porVisitar ? v.notas || '' : '',
     horarios: v.dias ? [horarioDe(v)] : []
   };
   sellar(m);
@@ -583,7 +595,7 @@ function renderDetalle(id) {
     </div>
     <div class="card">
       <div class="grid2">
-        <div><div class="label">Última visita</div><div class="value">${fmtFecha(ultimaVisita(m))}</div></div>
+        <div><div class="label">Última visita</div><div class="value">${ultimaVisita(m) ? fmtFecha(ultimaVisita(m)) : '<span class="pill info">Nuevo · por visitar</span>'}</div></div>
         <div><div class="label">Pacientes referidos</div><div class="value"><b>${pacientesTotal(m)}</b></div></div>
       </div>
       <div class="label">Próxima visita</div>
@@ -614,7 +626,8 @@ function renderDetalle(id) {
         <div class="visit">
           <div class="meta"><span>${fmtFecha(v.fecha)}</span><span>${v.pacientes} pac.</span></div>
           ${v.notas ? `<p>${esc(v.notas)}</p>` : ''}
-        </div>`).join('')}
+        </div>`).join('') || '<p class="hint">Todavía no fue visitado. Use "Registrar visita" después de la primera visita.</p>'}
+      ${m.notas ? `<div class="label" style="margin-top:10px">Notas</div><p style="margin:2px 0 0;white-space:pre-wrap">${esc(m.notas)}</p>` : ''}
     </div>
     ${bloquePacientesMedico(m)}
     <div class="actions">
@@ -827,7 +840,7 @@ async function generarPDF(f) {
   const head = ['Nombre', 'Institución', 'Fecha última visita', 'Pacientes referidos (total)']
     .concat(conPeriodo ? ['Referidos en el período'] : [])
     .concat(['Próxima visita', 'Ubicación', 'Provincia', 'Especialidad', 'Celular (WhatsApp)']);
-  const body = filas.map(r => [r.m.nombre, r.m.institucion, fmtFecha(r.fecha), String(r.pacientes)]
+  const body = filas.map(r => [r.m.nombre, r.m.institucion, r.fecha ? fmtFecha(r.fecha) : 'Por visitar', String(r.pacientes)]
     .concat(conPeriodo ? [String(r.enPeriodo)] : [])
     .concat([r.m.proximaVisita ? fmtFecha(r.m.proximaVisita) : '', [r.m.direccion, r.m.ciudad].filter(Boolean).join(', '), r.m.provincia, r.m.especialidad, r.m.celular]));
   const total = filas.reduce((s, r) => s + r.pacientes, 0);

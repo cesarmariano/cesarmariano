@@ -5,8 +5,9 @@
    - CORRECCIÓN: corrección de errores.
    Al publicar cambios: aumentar el número y agregar la entrada al principio de NOVEDADES.
    También lo usa sw.js para que cada dispositivo descargue la versión nueva. */
-self.ALVEON_VERSION = '2.4.0';
+self.ALVEON_VERSION = '2.5.0';
 self.ALVEON_NOVEDADES = [
+  { v: '2.5.0', fecha: '2026-11-19', cambios: ['Alta de médicos: casilla "Nuevo o por visitar" para médicos que todavía no se visitaron.'] },
   { v: '2.4.0', fecha: '2026-11-19', cambios: ['Google Drive: recuerda la cuenta y no pide elegirla en cada conexión.', 'El permiso de Google se reutiliza durante su hora de validez y la aplicación sincroniza sola al abrirse.', 'En Ajustes se muestra la cuenta conectada y el botón "Cambiar de cuenta de Google".'] },
   { v: '2.3.0', fecha: '2026-11-19', cambios: ['Si el mismo dato se modificó en dos dispositivos, la aplicación pregunta cuál conservar.', 'Versión visible en Ajustes e historial de versiones.'] },
   { v: '2.2.0', fecha: '2026-11-18', cambios: ['Sincronización campo por campo: se conserva el cambio más reciente de cada dato.'] },
