@@ -98,28 +98,30 @@ function marcarBorrado(obj, sub) {
 }
 
 /* Combina dos copias de los datos (de distintos dispositivos).
-   Cada campo conserva su modificación más reciente; visitas, actividades y horarios se unen. */
-function combinar(a, b) {
+   Cada campo conserva su modificación más reciente; visitas, actividades y horarios se unen.
+   ctx (opcional): { desde, conflictos } para detectar datos modificados en ambos dispositivos desde la
+   última sincronización ("desde"); "a" es este dispositivo y "b" la nube. Por defecto queda el más reciente. */
+function combinar(a, b, ctx) {
   a = normalizar(JSON.parse(JSON.stringify(a)));
   b = normalizar(JSON.parse(JSON.stringify(b)));
   const config = (a.config.actualizado || '') >= (b.config.actualizado || '') ? a.config : b.config;
   return {
-    medicos: combinarLista(a.medicos, b.medicos, 'visitas'),
-    pacientes: combinarLista(a.pacientes, b.pacientes, 'registros'),
+    medicos: combinarLista(a.medicos, b.medicos, 'visitas', ctx),
+    pacientes: combinarLista(a.pacientes, b.pacientes, 'registros', ctx),
     config
   };
 }
 
-function combinarLista(la, lb, sub) {
-  const mapa = new Map();
-  for (const m of [...la, ...lb]) {
+function combinarLista(la, lb, sub, ctx) {
+  const mapa = new Map(la.map(m => [m.id, m]));
+  for (const m of lb) {
     const prev = mapa.get(m.id);
-    mapa.set(m.id, prev ? combinarFicha(prev, m, sub) : m);
+    mapa.set(m.id, prev ? combinarFicha(prev, m, sub, ctx) : m);
   }
   return [...mapa.values()];
 }
 
-function combinarFicha(a, b, sub) {
+function combinarFicha(a, b, sub, ctx) {
   const ra = a.actualizado || '', rb = b.actualizado || '';
   const res = { id: a.id, t: {} };
   const claves = new Set([...Object.keys(a), ...Object.keys(b)].filter(k => !['id', 't', 'actualizado', sub, 'horarios'].includes(k)));
@@ -135,6 +137,10 @@ function combinarFicha(a, b, sub) {
     if (v !== undefined) res[k] = v;
     const tk = deB ? (b.t && b.t[k]) : (a.t && a.t[k]);
     if (tk) res.t[k] = tk;
+    // Conflicto: el mismo dato se cambió en los dos dispositivos, con valores distintos, desde la última sincronización.
+    if (ctx && !a.borrado && !b.borrado && propia(a, k) && propia(b, k) && a.t[k] > ctx.desde && b.t[k] > ctx.desde && !igual(a[k], b[k])) {
+      ctx.conflictos.push({ sub, id: a.id, campo: k, local: a[k], remoto: b[k], tLocal: a.t[k], tRemoto: b.t[k] });
+    }
   }
   res.actualizado = ra > rb ? ra : rb;
   // Listas: visitas y actividades se unen; en horarios, por cada uno gana su versión más reciente (incluido el borrado).
@@ -147,6 +153,15 @@ function combinarFicha(a, b, sub) {
       const ya = hs.get(h.id);
       if (!ya || (h.actualizado || '') > (ya.actualizado || '')) hs.set(h.id, h);
     });
+    if (ctx) {
+      const sinFecha = h => JSON.stringify({ ...h, actualizado: undefined });
+      for (const ha of a.horarios || []) {
+        const hb = (b.horarios || []).find(x => x.id === ha.id);
+        if (hb && ha.actualizado > ctx.desde && hb.actualizado > ctx.desde && sinFecha(ha) !== sinFecha(hb)) {
+          ctx.conflictos.push({ sub, id: a.id, campo: 'horario', horarioId: ha.id, local: ha, remoto: hb, tLocal: ha.actualizado, tRemoto: hb.actualizado });
+        }
+      }
+    }
     res.horarios = [...hs.values()];
   }
   return res;
@@ -914,15 +929,26 @@ async function sincronizar(interactivo) {
       estadoSync('Autorización recibida.');
     }
     const respaldo = local.ultimoRespaldo !== hoy() ? hoy() : null;
-    const datos = await Drive.sincronizar(db, combinar, respaldo, estadoSync);
+    const inicio = ahora();
+    const combinarPreguntando = async (loc, remoto) => {
+      const ctx = { desde: local.ultimaSync || '', conflictos: [] };
+      const datos = combinar(loc, remoto, ctx);
+      if (ctx.conflictos.length) {
+        estadoSync('Hay datos distintos en este dispositivo y en la nube: elija cuáles conservar.');
+        aplicarElecciones(datos, await preguntarConflictos(datos, ctx.conflictos));
+      }
+      return datos;
+    };
+    const datos = await Drive.sincronizar(db, combinarPreguntando, respaldo, estadoSync);
     db = normalizar(datos);
     escribir(STORAGE_KEY, db);
-    Object.assign(local, { driveConectado: true, ultimaSync: ahora(), pendiente: false });
+    Object.assign(local, { driveConectado: true, ultimaSync: inicio, pendiente: false });
     if (respaldo) local.ultimoRespaldo = respaldo;
     guardarLocal();
     estadoSync('');
     if (interactivo) toast('Datos sincronizados con Google Drive.');
-    refrescarVista();
+    // No se redibuja la pantalla si el usuario está completando un formulario.
+    if (!$('#wform') && !$('#fedit') && !$('#confirmar')) refrescarVista();
   } catch (e) {
     const msg = e.message || 'No se pudo sincronizar.';
     estadoSync(msg, true);
@@ -933,6 +959,82 @@ async function sincronizar(interactivo) {
 }
 
 let refrescarVista = () => irInicio();
+
+/* ---------- Datos distintos en dos dispositivos ---------- */
+const NOMBRES_CAMPO = {
+  nombre: 'Nombre', especialidad: 'Especialidad', institucion: 'Institución', provincia: 'Provincia', ciudad: 'Ciudad',
+  direccion: 'Dirección', celular: 'Celular', proximaVisita: 'Próxima visita', horario: 'Horario de atención',
+  dni: 'DNI', fechaNac: 'Fecha de nacimiento', telefono: 'Celular', contactoNombre: 'Familiar o cuidador', contactoTel: 'Celular del familiar',
+  obraSocial: 'Obra social', afiliado: 'Número de afiliado', diagnostico: 'Diagnóstico', medicoId: 'Médico que lo refirió',
+  tipo: 'Tipo de equipo', modalidad: 'Modalidad', marca: 'Marca', modelo: 'Modelo', serie: 'Número de serie', flujo: 'Flujo (L/min)',
+  horasIndicadas: 'Horas indicadas por día', presion: 'Presión', mascara: 'Máscara', alqInicio: 'Inicio del alquiler', alqFin: 'Fin del contrato',
+  cuota: 'Cuota mensual', estadoPago: 'Estado del pago', ventaFecha: 'Fecha de venta', precio: 'Precio', garantiaHasta: 'Garantía hasta',
+  proximoControl: 'Próximo control', proximoServicio: 'Próximo mantenimiento', estado: 'Estado'
+};
+
+function textoValor(c, v) {
+  if (c.campo === 'horario') return v.borrado ? '(horario borrado)' : [listaDias(diasDe(v)), rangoHoras(v), v.lugar, v.detalle].filter(Boolean).join(' · ');
+  if (vacio(v)) return '(vacío)';
+  if (c.campo === 'medicoId') return (db.medicos.find(m => m.id === v) || {}).nombre || v;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(v))) return fmtFecha(v);
+  return String(v);
+}
+const fechaHora = t => (t ? new Date(t).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
+
+/* Muestra una ventana con cada dato distinto y devuelve las elecciones: ['local' | 'remoto', ...]. */
+function preguntarConflictos(datos, conflictos) {
+  return new Promise(ok => {
+    const nombreDe = c => ((c.sub === 'visitas' ? datos.medicos : datos.pacientes).find(x => x.id === c.id) || {}).nombre || '';
+    const eleccion = conflictos.map(c => (c.tLocal >= c.tRemoto ? 'local' : 'remoto'));
+    const capa = document.createElement('div');
+    capa.className = 'modal-capa';
+    capa.setAttribute('role', 'dialog'); capa.setAttribute('aria-modal', 'true');
+    capa.innerHTML = `
+      <div class="modal">
+        <h2>Datos distintos en dos dispositivos</h2>
+        <p class="hint">Estos datos se modificaron en este dispositivo y en otro (por ejemplo, el celular y la computadora) desde la última sincronización. Elija cuál conservar en cada caso.</p>
+        ${conflictos.map((c, i) => `
+          <div class="conflicto">
+            <div class="conflicto-titulo">${esc(nombreDe(c))} · ${esc(NOMBRES_CAMPO[c.campo] || c.campo)}</div>
+            <button type="button" class="opcion" data-i="${i}" data-lado="local">
+              <small>Este dispositivo · ${esc(fechaHora(c.tLocal))}</small><span>${esc(textoValor(c, c.local))}</span></button>
+            <button type="button" class="opcion" data-i="${i}" data-lado="remoto">
+              <small>Otro dispositivo (nube) · ${esc(fechaHora(c.tRemoto))}</small><span>${esc(textoValor(c, c.remoto))}</span></button>
+          </div>`).join('')}
+        <div class="actions" style="margin:16px 0 0">
+          <button type="button" class="btn" id="cf-recientes">Usar los más recientes</button>
+          <button type="button" class="btn primary" id="cf-aplicar">Aplicar elección</button>
+        </div>
+      </div>`;
+    document.body.appendChild(capa);
+    const pintar = () => capa.querySelectorAll('.opcion').forEach(b => {
+      const on = eleccion[b.dataset.i] === b.dataset.lado;
+      b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
+    });
+    capa.querySelectorAll('.opcion').forEach(b => (b.onclick = () => { eleccion[b.dataset.i] = b.dataset.lado; pintar(); }));
+    const cerrar = e => { capa.remove(); ok(e); };
+    capa.querySelector('#cf-aplicar').onclick = () => cerrar(conflictos.map((c, i) => ({ c, lado: eleccion[i] })));
+    capa.querySelector('#cf-recientes').onclick = () => cerrar(conflictos.map(c => ({ c, lado: c.tLocal >= c.tRemoto ? 'local' : 'remoto' })));
+    pintar();
+  });
+}
+
+/* Aplica lo elegido con fecha actual, para que esa decisión llegue a los demás dispositivos. */
+function aplicarElecciones(datos, elecciones) {
+  const t = ahora();
+  for (const { c, lado } of elecciones) {
+    const ficha = (c.sub === 'visitas' ? datos.medicos : datos.pacientes).find(x => x.id === c.id);
+    if (!ficha) continue;
+    const valor = lado === 'local' ? c.local : c.remoto;
+    if (c.campo === 'horario') {
+      ficha.horarios = (ficha.horarios || []).map(h => (h.id === c.horarioId ? { ...valor, actualizado: t } : h));
+    } else {
+      if (valor === undefined) delete ficha[c.campo]; else ficha[c.campo] = valor;
+      ficha.t = ficha.t || {}; ficha.t[c.campo] = t;
+    }
+    ficha.actualizado = t;
+  }
+}
 
 /* ---------- Conexión alternativa (sin ventana emergente) ---------- */
 const direccionRetorno = () => new URL('index.html', location.href.split('#')[0].split('?')[0]).href;

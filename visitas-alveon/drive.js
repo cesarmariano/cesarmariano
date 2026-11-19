@@ -184,7 +184,7 @@ const Drive = (() => {
       const r = await api(`${API}/files/${existentes[0].id}?alt=media`);
       let remoto = null;
       try { remoto = await r.json(); } catch (_) { /* archivo dañado: se reemplaza */ }
-      if (remoto && Array.isArray(remoto.medicos)) datos = combinar(local, remoto);
+      if (remoto && Array.isArray(remoto.medicos)) datos = await combinar(local, remoto);
       await actualizar(existentes[0].id, JSON.stringify(datos));
     } else {
       await crear(ARCHIVO, JSON.stringify(datos), padre);
