@@ -214,3 +214,16 @@ body.con-nav #toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
 .opcion.on small::after { content: '  ✓ se conservará'; color: var(--brand); font-weight: 700; }
 .novedades summary { cursor: pointer; font-weight: 600; color: var(--brand); min-height: 40px; display: flex; align-items: center; }
 .novedades ul { margin: 6px 0 0; padding-left: 20px; color: var(--muted); font-size: .92rem; }
+
+/* Campos de fecha y hora: en iPhone (Safari) se dibujan con estilo propio, más anchos que la pantalla
+   y corridos a la derecha. Se quita ese estilo, se limitan al ancho disponible y se centra el valor. */
+input[type="date"].field, input[type="time"].field, input[type="month"].field {
+  -webkit-appearance: none; appearance: none;
+  display: block; width: 100%; max-width: 100%; min-width: 0;
+  text-align: center; font-size: 1.05rem; line-height: 1.2;
+}
+.field::-webkit-date-and-time-value { text-align: center; margin: 0 auto; }
+.field::-webkit-datetime-edit { padding: 0; }
+/* En las grillas de dos columnas, permitir que los campos se achiquen en lugar de desbordar. */
+.grid2 > *, .form-row { min-width: 0; }
+.grid2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
