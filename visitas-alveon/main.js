@@ -15,6 +15,8 @@ if (!procesarRetornoGoogle()) irInicio();
 pintarNube();
 // Precarga el acceso de Google para que la ventana se abra en el mismo toque (requisito de Chrome).
 Drive.precargar(clientId()).catch(() => { /* sin conexión: se reintenta al tocar Conectar */ });
+// Si el permiso de Google sigue vigente (dura 1 hora), sincroniza al abrir sin mostrar ninguna ventana.
+if (local.driveConectado && Drive.tieneToken()) setTimeout(() => sincronizar(false), 800);
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }

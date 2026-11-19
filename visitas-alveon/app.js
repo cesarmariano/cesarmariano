@@ -917,7 +917,7 @@ function programarSync() {
   if (Drive.tieneToken()) syncTimer = setTimeout(() => sincronizar(false), 2000);
 }
 
-async function sincronizar(interactivo) {
+async function sincronizar(interactivo, opciones = {}) {
   if (sincronizando) return;
   if (!navigator.onLine) { if (interactivo) toast('Sin conexión. Se sincronizará más tarde.'); return; }
   sincronizando = true; pintarNube();
@@ -925,7 +925,7 @@ async function sincronizar(interactivo) {
     if (!Drive.tieneToken()) {
       if (!interactivo) return;
       estadoSync('Esperando la autorización en la ventana de Google…');
-      await Drive.autorizar(clientId(), !local.driveConectado);
+      await Drive.autorizar(clientId(), { consentimiento: !local.driveConectado && !local.cuenta, cuenta: local.cuenta, elegirCuenta: !!opciones.elegirCuenta });
       estadoSync('Autorización recibida.');
     }
     const respaldo = local.ultimoRespaldo !== hoy() ? hoy() : null;
@@ -943,6 +943,7 @@ async function sincronizar(interactivo) {
     db = normalizar(datos);
     escribir(STORAGE_KEY, db);
     Object.assign(local, { driveConectado: true, ultimaSync: inicio, pendiente: false });
+    if (!local.cuenta || opciones.elegirCuenta) { try { local.cuenta = await Drive.cuenta(); } catch (_) { /* se intentará la próxima vez */ } }
     if (respaldo) local.ultimoRespaldo = respaldo;
     guardarLocal();
     estadoSync('');
@@ -1042,7 +1043,7 @@ function conectarPorRedireccion() {
   if (!clientId()) { toast('Primero ingrese el ID de cliente de Google.'); return; }
   const estado = uid();
   try { sessionStorage.setItem('alveon-oauth-estado', estado); } catch (_) { /* sin almacenamiento */ }
-  location.href = Drive.urlRedireccion(clientId(), direccionRetorno(), estado);
+  location.href = Drive.urlRedireccion(clientId(), direccionRetorno(), estado, local.cuenta);
 }
 // Al volver de Google: toma el permiso de la dirección, la limpia y sincroniza.
 function procesarRetornoGoogle() {
@@ -1131,13 +1132,15 @@ function renderAjustes() {
       ${cidFijo ? '' : `<div class="form-row"><label for="c-cid">ID de cliente de Google</label>
         <input class="field" id="c-cid" value="${esc(local.clientId)}" placeholder="xxxxxxxx.apps.googleusercontent.com" autocomplete="off"></div>`}
       <p class="hint">${local.driveConectado
-        ? `Conectado. Última sincronización: ${local.ultimaSync ? new Date(local.ultimaSync).toLocaleString('es-AR') : '—'}.`
+        ? `Conectado${local.cuenta ? ` como <b>${esc(local.cuenta)}</b>` : ''}. Última sincronización: ${local.ultimaSync ? new Date(local.ultimaSync).toLocaleString('es-AR') : '—'}.`
         : 'No conectado.'}</p>
       <p id="sync-estado" class="sync-estado${ultimoEstadoSync.error ? ' error' : ''}${ultimoEstadoSync.texto ? '' : ' vacio'}" role="status">${esc(ultimoEstadoSync.texto)}</p>
       <div class="actions">
         <button class="btn primary" id="c-sync">${local.driveConectado ? 'Sincronizar ahora' : 'Conectar Google Drive'}</button>
         ${local.driveConectado ? '<button class="btn danger" id="c-desc">Desconectar</button>' : '<button class="btn" id="c-redir">Conectar con otro método</button>'}
       </div>
+      ${local.driveConectado ? `<button class="btn" id="c-cuenta" style="margin-top:10px">Cambiar de cuenta de Google</button>
+        <p class="hint" style="margin-top:8px">El permiso de Google dura 1 hora. Al renovarlo, la ventana de Google se abre y se cierra sola con su cuenta, sin pedir que la elija.</p>` : ''}
       ${local.driveConectado ? '' : `<p class="hint">"Conectar con otro método" no usa ventana emergente: la página va a Google y vuelve. Requiere agregar
         <b>${esc(direccionRetorno())}</b> en "URI de redireccionamiento autorizados" del ID de cliente en Google Cloud.</p>`}
     </div>
@@ -1191,9 +1194,16 @@ function renderAjustes() {
     renderAjustes();
   };
   if ($('#c-redir')) $('#c-redir').onclick = conectarPorRedireccion;
+  if ($('#c-cuenta')) $('#c-cuenta').onclick = async () => {
+    Drive.olvidarToken();
+    refrescarVista = renderAjustes;
+    await sincronizar(true, { elegirCuenta: true });
+    refrescarVista = irInicio;
+    renderAjustes();
+  };
   if ($('#c-desc')) $('#c-desc').onclick = () => {
     if (!confirm('¿Desconectar Google Drive en este dispositivo? Los datos locales y los de Drive se conservan.')) return;
-    Drive.desconectar(); Object.assign(local, { driveConectado: false, pendiente: false }); guardarLocal(); pintarNube(); renderAjustes();
+    Drive.desconectar(); Object.assign(local, { driveConectado: false, pendiente: false, cuenta: '' }); guardarLocal(); pintarNube(); renderAjustes();
   };
   if ($('#c-inst')) $('#c-inst').onclick = async () => { eventoInstalar.prompt(); await eventoInstalar.userChoice; eventoInstalar = null; renderAjustes(); };
   $('#exp').onclick = () => {

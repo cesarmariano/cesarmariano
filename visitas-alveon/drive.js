@@ -11,6 +11,19 @@ const Drive = (() => {
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
   let token = null, vence = 0, tokenClient = null, gisPromise = null;
 
+  /* El permiso de Google dura 1 hora. Se guarda en este dispositivo para no pedirlo de nuevo
+     al cerrar y abrir la aplicación dentro de ese lapso. */
+  const CLAVE_TOKEN = 'alveon-token';
+  try { const g = JSON.parse(localStorage.getItem(CLAVE_TOKEN)); if (g && g.vence > Date.now()) ({ token, vence } = g); } catch (_) { /* sin datos */ }
+  function guardarToken(t, segundos) {
+    token = t; vence = Date.now() + (Number(segundos) || 3600) * 1000;
+    try { localStorage.setItem(CLAVE_TOKEN, JSON.stringify({ token, vence })); } catch (_) { /* sin almacenamiento */ }
+  }
+  function olvidarToken() {
+    token = null; vence = 0;
+    try { localStorage.removeItem(CLAVE_TOKEN); } catch (_) { /* sin almacenamiento */ }
+  }
+
   const tieneToken = () => token && Date.now() < vence - 60000;
 
   function cargarGIS() {
@@ -44,7 +57,7 @@ const Drive = (() => {
           const fallar = msg => (p ? p.mal(new Error(msg)) : window.dispatchEvent(new CustomEvent('drive-error', { detail: msg })));
           if (r.error) return fallar(mensajeError(r.error));
           if (!google.accounts.oauth2.hasGrantedAllScopes(r, SCOPE)) return fallar(MSG_CASILLA);
-          token = r.access_token; vence = Date.now() + (Number(r.expires_in) || 3600) * 1000;
+          guardarToken(r.access_token, r.expires_in);
           // La autorización puede llegar después de que Google informó (por error) que la ventana se cerró.
           if (p) p.ok(); else window.dispatchEvent(new Event('drive-token'));
         },
@@ -75,9 +88,10 @@ const Drive = (() => {
 
   /* Método alternativo sin ventana emergente: la página va a Google y Google la devuelve con el permiso.
      Requiere registrar la dirección de retorno en "URI de redireccionamiento autorizados" del ID de cliente. */
-  function urlRedireccion(clientId, retorno, estado) {
+  function urlRedireccion(clientId, retorno, estado, cuenta) {
     const q = new URLSearchParams({ client_id: clientId, redirect_uri: retorno, response_type: 'token', scope: SCOPE,
-      include_granted_scopes: 'true', state: estado, prompt: 'consent' });
+      include_granted_scopes: 'true', state: estado });
+    if (cuenta) q.set('login_hint', cuenta); else q.set('prompt', 'select_account');
     return 'https://accounts.google.com/o/oauth2/v2/auth?' + q;
   }
   // Procesa la respuesta de Google en la dirección (#access_token=…). Devuelve null si no hay respuesta.
@@ -87,7 +101,7 @@ const Drive = (() => {
     if (!estadoEsperado || q.get('state') !== estadoEsperado) return { error: 'La respuesta de Google no corresponde a esta solicitud. Vuelva a intentar.' };
     if (q.get('error')) return { error: mensajeError(q.get('error')) };
     if (!String(q.get('scope') || '').split(' ').includes(SCOPE)) return { error: MSG_CASILLA };
-    token = q.get('access_token'); vence = Date.now() + (Number(q.get('expires_in')) || 3600) * 1000;
+    guardarToken(q.get('access_token'), q.get('expires_in'));
     return { ok: true };
   }
 
@@ -97,7 +111,9 @@ const Drive = (() => {
   }
 
   // Debe llamarse directamente desde un toque del usuario, sin esperas previas.
-  function autorizar(clientId, forzarConsentimiento) {
+  /* opciones: { consentimiento: pedir el permiso aunque ya se haya dado, cuenta: correo conocido (evita elegir la cuenta),
+     elegirCuenta: mostrar la lista de cuentas } */
+  function autorizar(clientId, opciones = {}) {
     if (!clientId) return Promise.reject(new Error('Falta configurar el ID de cliente de Google en Ajustes.'));
     const pedir = () => new Promise((ok, mal) => {
       if (pendiente) { clearTimeout(pendiente.reloj); pendiente.mal(new Error('Solicitud reemplazada.')); }
@@ -106,7 +122,10 @@ const Drive = (() => {
         if (pendiente && pendiente.reloj === reloj) { pendiente = null; mal(new Error('No hubo respuesta de la ventana de Google. Revise si el navegador la bloqueó y vuelva a intentar.')); }
       }, 120000);
       pendiente = { ok, mal, reloj };
-      tokenClient.requestAccessToken({ prompt: forzarConsentimiento ? 'consent' : '' });
+      const pedido = { prompt: opciones.elegirCuenta ? 'select_account' : opciones.consentimiento ? 'consent' : '' };
+      // Con la cuenta indicada, Google no muestra la lista de cuentas y, si el permiso ya fue dado, la ventana se cierra sola.
+      if (opciones.cuenta && !opciones.elegirCuenta) { pedido.login_hint = opciones.cuenta; pedido.hint = opciones.cuenta; }
+      tokenClient.requestAccessToken(pedido);
     });
     // Caso normal: el acceso ya está precargado y la ventana se abre en el mismo toque.
     if (tokenClient && clientePara === clientId) return pedir();
@@ -128,12 +147,12 @@ const Drive = (() => {
     if (r.ok) return r;
     let detalle = '';
     try { detalle = JSON.stringify(await r.json()); } catch (_) { /* sin detalle */ }
-    if (r.status === 401) { token = null; throw new Error('La sesión de Google venció. Toque sincronizar nuevamente.'); }
+    if (r.status === 401) { olvidarToken(); throw new Error('La sesión de Google venció. Toque sincronizar nuevamente.'); }
     if (/accessNotConfigured|SERVICE_DISABLED|has not been used|is disabled/i.test(detalle)) {
       throw new Error('La API de Google Drive no está habilitada en el proyecto de Google Cloud. Habilítela en console.cloud.google.com/apis/library/drive.googleapis.com (botón "Habilitar"), espere unos minutos y vuelva a intentar.');
     }
     if (/insufficient|SCOPE/i.test(detalle)) {
-      token = null;
+      olvidarToken();
       throw new Error('Falta el permiso para Drive. Vuelva a conectar y marque la casilla de Google Drive en la ventana de Google.');
     }
     const msg = (detalle.match(/"message":"([^"]+)"/) || [])[1];
@@ -201,8 +220,14 @@ const Drive = (() => {
 
   function desconectar() {
     if (token && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(token, () => {});
-    token = null; vence = 0;
+    olvidarToken();
   }
 
-  return { autorizar, precargar, sincronizar, tieneToken, desconectar, urlRedireccion, leerRedireccion };
+  // Correo de la cuenta conectada (para no tener que elegirla la próxima vez).
+  async function cuenta() {
+    const r = await api(`${API}/about?fields=user(emailAddress)`);
+    return ((await r.json()).user || {}).emailAddress || '';
+  }
+
+  return { autorizar, precargar, sincronizar, tieneToken, desconectar, olvidarToken, cuenta, urlRedireccion, leerRedireccion };
 })();
