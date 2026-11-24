@@ -5,8 +5,9 @@
    - CORRECCIÓN: corrección de errores.
    Al publicar cambios: aumentar el número y agregar la entrada al principio de NOVEDADES.
    También lo usa sw.js para que cada dispositivo descargue la versión nueva. */
-self.ALVEON_VERSION = '2.5.2';
+self.ALVEON_VERSION = '2.5.3';
 self.ALVEON_NOVEDADES = [
+  { v: '2.5.3', fecha: '2026-11-24', cambios: ['Identificador propio de la aplicación: el navegador ya no la confunde con otras aplicaciones del mismo sitio (por ejemplo, Finanzas Personales).'] },
   { v: '2.5.2', fecha: '2026-11-20', cambios: ['El modo sin conexión ya no borra los archivos guardados de otras aplicaciones del mismo sitio (Finanzas familiares).'] },
   { v: '2.5.1', fecha: '2026-11-19', cambios: ['Los campos de fecha y hora quedan centrados y dentro de la pantalla en el iPhone.'] },
   { v: '2.5.0', fecha: '2026-11-19', cambios: ['Alta de médicos: casilla "Nuevo o por visitar" para médicos que todavía no se visitaron.'] },

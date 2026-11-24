@@ -2,7 +2,7 @@
   "name": "Alveon – Médicos y pacientes",
   "short_name": "Alveon",
   "description": "Visitas a médicos y seguimiento de pacientes de oxigenoterapia y CPAP de Alveon.",
-  "id": "./index.html",
+  "id": "/cesarmariano/visitas-alveon/",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
